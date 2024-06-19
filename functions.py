@@ -187,7 +187,7 @@ def get_secure_input(prompt):
 def validate_mnemonic(mnemonic):
     # Check if the input contains exactly 24 words split by spaces or tabs
     words = mnemonic.split()
-    if len(words) == 24:
+    if len(words) >= 12:
         return True
     else:
         return False
