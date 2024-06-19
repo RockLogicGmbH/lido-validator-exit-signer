@@ -43,7 +43,7 @@ jobs:
           poetry install --no-root
       - name: Build CLI
         run: |
-          poetry run pyinstaller --onefile --name cli-${{ matrix.os }} --name exitsigner main.py
+          poetry run pyinstaller --onefile --name cli-${{ matrix.os }} main.py
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v2
         with:
@@ -78,19 +78,19 @@ jobs:
       - name: Download ubuntu binary from build into dist
         uses: actions/download-artifact@e9ef242655d12993efdcda9058dee2db83a2cb9b
         with:
-          name: exitsigner-ubuntu-latest
+          name: cli-ubuntu-latest
           path: dist
         if: ${{ !contains(github.event.head_commit.message, '[NOCI]') }}
       - name: Download windows binary from build into dist
         uses: actions/download-artifact@e9ef242655d12993efdcda9058dee2db83a2cb9b
         with:
-          name: exitsigner-windows-latest
+          name: cli-windows-latest
           path: dist
         if: ${{ !contains(github.event.head_commit.message, '[NOCI]') }}
       - name: Download macos binary from build into dist
         uses: actions/download-artifact@e9ef242655d12993efdcda9058dee2db83a2cb9b
         with:
-          name: exitsigner-macos-latest
+          name: cli-macos-latest
           path: dist
         if: ${{ !contains(github.event.head_commit.message, '[NOCI]') }}
 
