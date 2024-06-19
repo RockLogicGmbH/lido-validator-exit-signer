@@ -1,0 +1,120 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # Build
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        python-version: ["3.10"]
+      fail-fast: false
+
+    steps:
+      # Checkout code
+      - name: Check out Git repository
+        uses: actions/checkout@v3
+
+      # Build CLI
+      - name: Install Poetry
+        run: |
+          pipx install poetry
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "${{ matrix.python-version }}"
+          cache: poetry
+      - name: Set Poetry environment on macOS and Linux
+        run: |
+          poetry env use ${{ matrix.python-version }}
+        if: runner.os != 'Windows'
+      - name: Set Poetry environment on Windows
+        run: |
+          poetry env use C:\hostedtoolcache\windows\Python\3.10.11\x64\python.exe
+        if: runner.os == 'Windows'
+      - name: Install dependencies
+        run: |
+          poetry install --no-root
+      - name: Build CLI
+        run: |
+          poetry run pyinstaller --onefile --name cli-${{ matrix.os }} --name exitsigner main.py
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: cli-${{ matrix.os }}
+          path: dist/
+
+  # Release
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v3
+
+      - name: Set Versions
+        id: variables
+        run: |
+          echo "release=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+          APP_VERSION=$(grep -E '^\s*version\s*=' pyproject.toml | awk -F '=' '{gsub(/[[:space:]]*/, "", $2); gsub(/"/, "", $2); print $2}')
+          echo "version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      # Download artifacts from build
+      - name: create dist folder
+        run: |
+          mkdir dist
+        shell: bash
+
+      - name: Download ubuntu binary from build into dist
+        uses: actions/download-artifact@e9ef242655d12993efdcda9058dee2db83a2cb9b
+        with:
+          name: exitsigner-ubuntu-latest
+          path: dist
+        if: ${{ !contains(github.event.head_commit.message, '[NOCI]') }}
+      - name: Download windows binary from build into dist
+        uses: actions/download-artifact@e9ef242655d12993efdcda9058dee2db83a2cb9b
+        with:
+          name: exitsigner-windows-latest
+          path: dist
+        if: ${{ !contains(github.event.head_commit.message, '[NOCI]') }}
+      - name: Download macos binary from build into dist
+        uses: actions/download-artifact@e9ef242655d12993efdcda9058dee2db83a2cb9b
+        with:
+          name: exitsigner-macos-latest
+          path: dist
+        if: ${{ !contains(github.event.head_commit.message, '[NOCI]') }}
+
+      # Create release if [DRAFT] is in commit using the version from pyproject.toml.
+      # During creation, upload all the downloaded build artifacts
+      - name: Create Draft Release
+        uses: ncipollo/release-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag: "${{ steps.variables.outputs.version }}-draft"
+          name: "${{ steps.variables.outputs.version }}"
+          skipIfReleaseExists: true
+          updateOnlyUnreleased: true
+          artifacts: dist/*
+          draft: true
+          allowUpdates: true
+          replacesArtifacts: true
+          prerelease: true
+        if: ${{ contains(github.event.head_commit.message, '[DRAFT]') }}
+      # if no release was created, just update the artifacts
+      - name: "Upload artifacts to existing draft release ${{ steps.variables.outputs.version }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload --clobber "${{ steps.variables.outputs.version }}-draft" dist/*
+        if: ${{ !contains(github.event.head_commit.message, '[NOCI]') && !contains(github.event.head_commit.message, '[DRAFT]') }}
