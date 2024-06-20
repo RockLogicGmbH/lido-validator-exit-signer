@@ -1,4 +1,4 @@
-# Validator Exit Signer
+# ExitSigner
 
 A CLI <!-- and Docker--> solution to sign exit messages for the LIDO Validator Ejector.
 
