@@ -3,6 +3,7 @@ import getpass
 import glob
 import os
 import platform
+import sys
 import tarfile
 from urllib.parse import urlparse
 import zipfile
@@ -16,7 +17,7 @@ def write_default_env_file(default_values):
         with open(env_file_path, 'w') as f:
             for key, value in default_values.items():
                 f.write(f"# {key}={value}\n")
-        return True
+        return env_file_path
     return False
 
 # Function to download ethdo from Github
@@ -143,7 +144,12 @@ def create_directory(directory_path):
 
 # Returns script home directory
 def script_home_dir():
-    script_dir = os.path.dirname(os.path.realpath(__file__))
+    if getattr(sys, 'frozen', False):
+        # Running in a bundled executable (e.g., created by PyInstaller)
+        script_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+    else:
+        # Running as a script
+        script_dir = os.path.dirname(os.path.realpath(__file__))
     return script_dir
 
 # Return true if user is elevated (sudo/root/admin) in win/lin/mac
