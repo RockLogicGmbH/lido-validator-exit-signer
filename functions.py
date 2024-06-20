@@ -12,6 +12,19 @@ import zipfile
 import requests
 import oyaml as yaml
 import hashlib
+import validators
+import semver
+
+def is_semantic_version(version):
+    try:
+        semver.parse_version_info(version)
+        return True
+    except ValueError:
+        return False
+    
+# Chekc for valid URL
+def is_valid_url(url):
+    return validators.url(url)
 
 # Generate .env file (if not exist) with default config settings
 def write_default_env_file(default_values):
@@ -134,10 +147,60 @@ def detect_validatorejector_directory(expected_home_directory="/opt/stereum"):
     # Return the first match (or None if no match)
     return matching_folders[0] if matching_folders else None
 
+# Check if given num is numeric and a whole number
+# Note that also string "3" is considered a whole number alson as strict is False (default)
+# Test cases:
+# print(is_whole_number(3))           # True
+# print(is_whole_number(1.5))         # False
+# print(is_whole_number("3"))         # True (strict=False)
+# print(is_whole_number("1.5"))       # False (strict=False)
+# print(is_whole_number("3.0"))       # True (strict=False)
+# print(is_whole_number("abc"))       # False
+# print(is_whole_number(True))        # False
+# print(is_whole_number(None))        # False
+# print("--- Strict mode ---")
+# print(is_whole_number("3", strict=True))       # False (strict=True)
+# print(is_whole_number("1.5", strict=True))     # False (strict=True)
+# print(is_whole_number("3.0", strict=True))     # False (strict=True)
+# print(is_whole_number(True, strict=True))      # False (strict=True)
+def is_whole_number(num, strict=False):
+    if isinstance(num, bool):
+        # For boolean values, return False as they are not considered whole numbers
+        return False
+    elif isinstance(num, (int, float)):
+        # Check if num is numeric (either int or float)
+        if isinstance(num, int):
+            # If num is an integer, return True directly
+            return True
+        else:
+            # If num is a float, check if it is a whole number
+            return num.is_integer()
+    elif isinstance(num, str):
+        if strict:
+            # If strict is True, we do not allow strings that represent numbers
+            return False
+        else:
+            # Check if num is a string representing a numeric value
+            try:
+                float_num = float(num)
+                return float_num.is_integer()
+            except ValueError:
+                return False
+    else:
+        # num is not numeric or a string
+        return False
+    
 # Function to get validators that need signed exit messages from KAPI
-def get_validators_that_need_a_signed_exit_message_from_kapi(operator_id, kapi_url):
+def get_validators_that_need_a_signed_exit_message_from_kapi(operator_id, kapi_url, percent=10):
+    if not is_whole_number(operator_id):
+        if operator_id:
+            print(f'Invalid operator id "{operator_id}" for KAPI request specified')
+        else:
+            print(f'No operator id for KAPI request specified') 
+        return False
     try:
-        result = requests.get(f"{kapi_url}/v1/modules/1/validators/validator-exits-to-prepare/{operator_id}")
+        percent = percent if is_whole_number(percent) and percent > 0 and percent <= 100 else 10
+        result = requests.get(f"{kapi_url}/v1/modules/1/validators/validator-exits-to-prepare/{operator_id}?percent={percent}")
         if result.status_code == 200:
             jsonresp = result.json()
             if "data" in jsonresp:
@@ -247,7 +310,7 @@ def get_secure_input(prompt):
     
 # Validate MNEMONIC format
 def validate_mnemonic(mnemonic):
-    # Check if the input contains exactly 24 words split by spaces or tabs
+    # Check if the input contains at least 12 words split by spaces or tabs
     words = mnemonic.split()
     if len(words) >= 12:
         return True

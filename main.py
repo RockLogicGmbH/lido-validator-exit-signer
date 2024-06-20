@@ -18,6 +18,7 @@ default_values = {
     "KAPI_URL": "http://127.0.0.1:3600",
     "NODE_URL": "http://127.0.0.1:5052",
     "OPERATOR_ID": "",
+    "SIGN_PERCENT": 10,
     "VALIDATOR_EJECTOR_MESSAGE_FOLDER": "",
     "ETHDO_VERSION": "1.35.2",
 }
@@ -26,6 +27,7 @@ default_values = {
 NODE_URL = os.getenv("NODE_URL", default_values["NODE_URL"])
 KAPI_URL = os.getenv("KAPI_URL", default_values["KAPI_URL"])
 OPERATOR_ID = os.getenv("OPERATOR_ID", default_values["OPERATOR_ID"])
+SIGN_PERCENT = int(os.getenv("SIGN_PERCENT", default_values["SIGN_PERCENT"]))
 VALIDATOR_EJECTOR_MESSAGE_FOLDER = os.getenv("VALIDATOR_EJECTOR_MESSAGE_FOLDER", default_values["VALIDATOR_EJECTOR_MESSAGE_FOLDER"])
 ETHDO_VERSION = os.getenv("ETHDO_VERSION", default_values["ETHDO_VERSION"])
 
@@ -43,6 +45,7 @@ else:
 # print(f"NODE_URL: {NODE_URL}")
 # print(f"KAPI_URL: {KAPI_URL}")
 # print(f"OPERATOR_ID: {OPERATOR_ID}")
+# print(f"SIGN_PERCENT: {SIGN_PERCENT}")
 # print(f"VALIDATOR_EJECTOR_MESSAGE_FOLDER: {VALIDATOR_EJECTOR_MESSAGE_FOLDER}")
 # print(f"ETHDO_VERSION: {ETHDO_VERSION}")
 # print(f"ETHDO_URL: {ETHDO_URL}")
@@ -56,7 +59,7 @@ else:
 def main():
 
     # Set globals
-    global VALIDATOR_EJECTOR_MESSAGE_FOLDER, NODE_URL, OPERATOR_ID
+    global VALIDATOR_EJECTOR_MESSAGE_FOLDER, NODE_URL, OPERATOR_ID, SIGN_PERCENT
 
     # Set script home directory
     SCRIPT_HOME_DIR = script_home_dir()
@@ -65,8 +68,9 @@ def main():
     os.chdir(SCRIPT_HOME_DIR)
 
     # Argument parsing setup
-    parser = argparse.ArgumentParser(description='Exit Signer (Auto sign LIDO exit messages by mnemonic)')
-    parser.add_argument('--mnemonic', type=str, help='Specify the mnemonic directly (optional)')
+    parser = argparse.ArgumentParser(description='Exit Signer (Auto sign exit messages for LIDO validators by mnemonic)')
+    parser.add_argument('--mnemonic', type=str, help='Specify the mnemonic directly (optional and strictly *not* recommended)')
+    parser.add_argument('--signpercent', nargs='?', const=True, type=int, default=SIGN_PERCENT, help=f'Percent of validators managed by the operator to sign exit messages for (Default: {SIGN_PERCENT})')
     parser.add_argument('--writeconfig', action='store_true', help='Write .env file (if not exist) with default config values')
 
     # Parse arguments
@@ -80,17 +84,65 @@ def main():
             print("Default .env file already exists")
         return
     
+    # Handle --signpercent argument
+    if args.signpercent:
+        if not is_whole_number(args.signpercent) or args.signpercent > 100 or args.signpercent < 1:
+            print("Invalid value for argument --signpercent (Expected range 1-100)")
+            return
+        SIGN_PERCENT=args.signpercent
+
     # Check if user has elevated permission
     if not is_elevated_user():
         print("This application requires elevated permission!")
         return
     
+    # Try to auto detect validatorejector directory
+    VALIDATOR_EJECTOR_FOLDER = detect_validatorejector_directory()
+
     # Auto detect validatorejector message directory if not defined in config
     if VALIDATOR_EJECTOR_MESSAGE_FOLDER == default_values["VALIDATOR_EJECTOR_MESSAGE_FOLDER"]:
-        VALIDATOR_EJECTOR_FOLDER = detect_validatorejector_directory()
         VALIDATOR_EJECTOR_MESSAGE_FOLDER = os.path.join(VALIDATOR_EJECTOR_FOLDER, "messages") if VALIDATOR_EJECTOR_FOLDER is not None else None
+    
+    # Auto detect NODE_URL and OPERATOR_ID if not defined in config and VALIDATOR_EJECTOR_FOLDER could be found
+    if VALIDATOR_EJECTOR_FOLDER:
+        validator_ejector_config_id = os.path.basename(VALIDATOR_EJECTOR_FOLDER.replace("validatorejector-", ""))
+        validator_ejector_yaml_file = f"/etc/stereum/{validator_ejector_config_id}.yaml"
+        if os.path.exists(validator_ejector_yaml_file):
+            validator_ejector_yaml_data = read_yaml_file(validator_ejector_yaml_file)
+            NODE_URL = validator_ejector_yaml_data['env']['CONSENSUS_NODE'] if NODE_URL == default_values["NODE_URL"] else NODE_URL
+            OPERATOR_ID = validator_ejector_yaml_data['env']['OPERATOR_ID'] if OPERATOR_ID == default_values["OPERATOR_ID"] else OPERATOR_ID
 
-    # Check core rerquirements
+    # Show config values
+    # print(f"NODE_URL: {NODE_URL}")
+    # print(f"KAPI_URL: {KAPI_URL}")
+    # print(f"OPERATOR_ID: {OPERATOR_ID}")
+    # print(f"SIGN_PERCENT: {SIGN_PERCENT}")
+    # print(f"VALIDATOR_EJECTOR_MESSAGE_FOLDER: {VALIDATOR_EJECTOR_MESSAGE_FOLDER}")
+    # print(f"ETHDO_VERSION: {ETHDO_VERSION}")
+    # print(f"ETHDO_URL: {ETHDO_URL}")
+    # sys.exit()
+
+    # Check NODE_URL
+    if not is_valid_url(NODE_URL):
+        print("Setting NODE_URL invalid or not specified (Expected valid URL)")
+        return
+    
+    # Check KAPI_URL
+    if not is_valid_url(KAPI_URL):
+        print("Setting KAPI_URL invalid or not specified (Expected valid URL)")
+        return
+    
+    # Check OPERATOR_ID
+    if not OPERATOR_ID or not is_whole_number(OPERATOR_ID):
+        print("Setting OPERATOR_ID invalid or not specified")
+        return
+    
+    # Check SIGN_PERCENT
+    if not is_whole_number(SIGN_PERCENT) or SIGN_PERCENT > 100 or SIGN_PERCENT < 1:
+        print("Setting SIGN_PERCENT invalid or not specified (Expected range 1-100)")
+        return
+    
+    # Check VALIDATOR_EJECTOR_MESSAGE_FOLDER
     if not VALIDATOR_EJECTOR_MESSAGE_FOLDER:
         print("Could not find path to validatorejector messages folder (VALIDATOR_EJECTOR_MESSAGE_FOLDER)")
         return
@@ -104,14 +156,15 @@ def main():
         print("Path for setting VALIDATOR_EJECTOR_MESSAGE_FOLDER does not exist")
         return
     
-    # Auto detect NODE_URL and OPERATOR_ID if not defined in config
-    if VALIDATOR_EJECTOR_FOLDER:
-        validator_ejector_config_id = os.path.basename(VALIDATOR_EJECTOR_FOLDER.replace("validatorejector-", ""))
-        validator_ejector_yaml_file = f"/etc/stereum/{validator_ejector_config_id}.yaml"
-        if os.path.exists(validator_ejector_yaml_file):
-            validator_ejector_yaml_data = read_yaml_file(validator_ejector_yaml_file)
-            NODE_URL = validator_ejector_yaml_data['env']['CONSENSUS_NODE'] if NODE_URL == default_values["NODE_URL"] else NODE_URL
-            OPERATOR_ID = validator_ejector_yaml_data['env']['OPERATOR_ID'] if OPERATOR_ID == default_values["OPERATOR_ID"] else OPERATOR_ID
+    # Check ETHDO_VERSION
+    if not is_semantic_version(ETHDO_VERSION):
+        print("Setting ETHDO_VERSION invalid or not specified (Expected valid semantic version)")
+        return
+    
+    # Check ETHDO_URL
+    if not is_valid_url(ETHDO_URL):
+        print("Setting ETHDO_URL invalid or not specified (Expected valid URL)")
+        return
 
     # Install ethdo binary from GitHub
     print("Install ethdo")
@@ -134,7 +187,7 @@ def main():
         existing_signed_exit_messages.append(filename_without_extension)
 
     # Get validators that need a signed exit message from KAPI
-    jsonresult = get_validators_that_need_a_signed_exit_message_from_kapi(OPERATOR_ID, KAPI_URL)
+    jsonresult = get_validators_that_need_a_signed_exit_message_from_kapi(OPERATOR_ID, KAPI_URL,SIGN_PERCENT)
     if not jsonresult:
         return
     validators_that_need_a_signed_exit_message = jsonresult["data"]
@@ -170,10 +223,10 @@ def main():
             if validate_mnemonic(mnemonic):
                 break
             else:
-                print("Invalid mnemonic (expected 24 words splitted by space)")
+                print("Invalid mnemonic (expected at least 12 words splitted by space)")
     
     # Generate offline-preparation.json (this will generate all infos needed)
-    print("Generate offline-preparation.json, pleasd be patient..")
+    print("Generate offline-preparation.json, please be patient..")
     offline_preparation_json = os.path.join(SCRIPT_HOME_DIR, 'offline-preparation.json')
     process = subprocess.run(f"{ethdo_path} --connection={NODE_URL} validator exit --json --verbose --debug --prepare-offline", capture_output=True, text=True, shell=True)
     exit_code = process.returncode

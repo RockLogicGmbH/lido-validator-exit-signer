@@ -11,6 +11,8 @@ requests = "^2.32.3"
 pyinstaller = {version = "^6.6.0", python = ">=3.8,<3.13"}
 python-dotenv = "^1.0.1"
 oyaml = "^1.0"
+validators = "^0.28.3"
+semver = "^3.0.2"
 
 [build-system]
 requires = ["poetry-core"]
