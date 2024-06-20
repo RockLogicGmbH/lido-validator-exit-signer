@@ -126,7 +126,7 @@ def main():
     # Auto detect NODE_URL and OPERATOR_ID if not defined in config and VALIDATOR_EJECTOR_FOLDER could be found
     if VALIDATOR_EJECTOR_FOLDER:
         validator_ejector_config_id = os.path.basename(VALIDATOR_EJECTOR_FOLDER.replace("validatorejector-", ""))
-        validator_ejector_yaml_file = f"/etc/stereum/{validator_ejector_config_id}.yaml"
+        validator_ejector_yaml_file = f"/etc/stereum/services/{validator_ejector_config_id}.yaml"
         if args.debug:
             print(f"[DEBUG] validator_ejector_config_id = {validator_ejector_config_id}")
             print(f"[DEBUG] validator_ejector_yaml_file = {validator_ejector_yaml_file}")
