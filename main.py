@@ -115,7 +115,13 @@ def main():
 
     # Install ethdo binary from GitHub
     print("Install ethdo")
-    ethdo_path = install_ethdo(ETHDO_URL)
+    try:
+        ethdo_path = install_ethdo(ETHDO_URL)
+        if not ethdo_path:
+            return 
+    except Exception as e:
+        print(f"Failed to install ethdo ({e})")
+        return
 
     # Collect infos
     print("Collect validator data")

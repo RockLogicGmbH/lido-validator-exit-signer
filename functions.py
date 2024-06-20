@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import zipfile
 import requests
 import oyaml as yaml
+import hashlib
 
 # Generate .env file (if not exist) with default config settings
 def write_default_env_file(default_values):
@@ -21,6 +22,28 @@ def write_default_env_file(default_values):
         return env_file_path
     return False
 
+def sha256_hash_file(filename):
+    # Initialize the hash object
+    sha256_hash = hashlib.sha256()
+
+    try:
+        # Open the file in binary mode
+        with open(filename, "rb") as f:
+            # Read and update hash in chunks of 4K
+            for chunk in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(chunk)
+
+        # Get the hexadecimal representation of the hash
+        hex_digest = sha256_hash.hexdigest()
+        return hex_digest
+
+    except FileNotFoundError:
+        print(f"File '{filename}' not found.")
+        return None
+    except IOError as e:
+        print(f"Error reading '{filename}': {e}")
+        return None
+    
 # Function to download ethdo from Github
 def install_ethdo(url,dockerized=False):
     filename = os.path.basename(urlparse(url).path)
@@ -39,6 +62,14 @@ def install_ethdo(url,dockerized=False):
     with open(tar_file_path, "wb") as f:
         f.write(response.content)
 
+    # Verify the tarball hash
+    response = requests.get(f"{url}.sha256")
+    hash = response.content.strip().decode('utf-8')
+    if sha256_hash_file(tar_file_path) != hash:
+        os.remove(tar_file_path)
+        print("Failed to install ethdo (Invalid tarball hash)")
+        return None
+
     # Extract the file based on the extension
     if extension == ".tar.gz" or extension == ".tgz" or extension == ".gz":
         with tarfile.open(tar_file_path, "r:gz") as tar:
@@ -47,6 +78,7 @@ def install_ethdo(url,dockerized=False):
         with zipfile.ZipFile(tar_file_path, "r") as zip_ref:
             zip_ref.extractall(extracted_dir)
     else:
+        os.remove(tar_file_path)
         print("Failed to install ethdo (Unsupported file format)",extension)
         return None
 
