@@ -74,6 +74,7 @@ def main():
     parser.add_argument('--writeconfig', action='store_true', help='Write .env file (if not exist) with default config values')
     parser.add_argument('--upgrade', action='store_true', help='Upgrade exitsigner application')
     parser.add_argument('--version', action='store_true', help='Get current version of the exitsigner')
+    parser.add_argument('--debug', action='store_true', help='Expose debug infos')
 
     # Parse arguments
     args = parser.parse_args()
@@ -113,19 +114,30 @@ def main():
     
     # Try to auto detect validatorejector directory
     VALIDATOR_EJECTOR_FOLDER = detect_validatorejector_directory()
+    if args.debug:
+        print("[DEBUG] VALIDATOR_EJECTOR_FOLDER = {VALIDATOR_EJECTOR_FOLDER}")
 
     # Auto detect validatorejector message directory if not defined in config
     if VALIDATOR_EJECTOR_MESSAGE_FOLDER == default_values["VALIDATOR_EJECTOR_MESSAGE_FOLDER"]:
         VALIDATOR_EJECTOR_MESSAGE_FOLDER = os.path.join(VALIDATOR_EJECTOR_FOLDER, "messages") if VALIDATOR_EJECTOR_FOLDER is not None else None
-    
+    if args.debug:
+        print("[DEBUG] VALIDATOR_EJECTOR_MESSAGE_FOLDER = {VALIDATOR_EJECTOR_MESSAGE_FOLDER}")
+
     # Auto detect NODE_URL and OPERATOR_ID if not defined in config and VALIDATOR_EJECTOR_FOLDER could be found
     if VALIDATOR_EJECTOR_FOLDER:
         validator_ejector_config_id = os.path.basename(VALIDATOR_EJECTOR_FOLDER.replace("validatorejector-", ""))
         validator_ejector_yaml_file = f"/etc/stereum/{validator_ejector_config_id}.yaml"
+        if args.debug:
+            print("[DEBUG] validator_ejector_config_id = {validator_ejector_config_id}")
+            print("[DEBUG] validator_ejector_yaml_file = {validator_ejector_yaml_file}")
         if os.path.exists(validator_ejector_yaml_file):
             validator_ejector_yaml_data = read_yaml_file(validator_ejector_yaml_file)
             NODE_URL = validator_ejector_yaml_data['env']['CONSENSUS_NODE'] if NODE_URL == default_values["NODE_URL"] else NODE_URL
             OPERATOR_ID = validator_ejector_yaml_data['env']['OPERATOR_ID'] if OPERATOR_ID == default_values["OPERATOR_ID"] else OPERATOR_ID
+            if args.debug:
+                print("[DEBUG] validator_ejector_yaml_data = ",validator_ejector_yaml_data)
+                print("[DEBUG] NODE_URL = {NODE_URL}")
+                print("[DEBUG] OPERATOR_ID = {OPERATOR_ID}")
 
     # Show config values
     # print(f"NODE_URL: {NODE_URL}")
