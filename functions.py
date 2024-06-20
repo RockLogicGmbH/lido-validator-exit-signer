@@ -136,16 +136,20 @@ def detect_validatorejector_directory(expected_home_directory="/opt/stereum"):
 
 # Function to get validators that need signed exit messages from KAPI
 def get_validators_that_need_a_signed_exit_message_from_kapi(operator_id, kapi_url):
-    result = requests.get(f"{kapi_url}/v1/modules/1/validators/validator-exits-to-prepare/{operator_id}")
-    if result.status_code == 200:
-        jsonresp = result.json()
-        if "data" in jsonresp:
-            return jsonresp
-        print(f"KAPI responded with invalid format (data key missing)")
-        return False
-    else:
-        print(f"Request failed with status code: {result.status_code}")
-        return False
+    try:
+        result = requests.get(f"{kapi_url}/v1/modules/1/validators/validator-exits-to-prepare/{operator_id}")
+        if result.status_code == 200:
+            jsonresp = result.json()
+            if "data" in jsonresp:
+                return jsonresp
+            print(f"KAPI responded with invalid format (data key missing)")
+            return False
+        else:
+            print(f"Request to KAPI failed with status code: {result.status_code}")
+            return False
+    except Exception as e:
+            print(f"Request to KAPI failed with error: {e}")
+            return False
 
 # Get first key from list where value contains "search"
 # Example
