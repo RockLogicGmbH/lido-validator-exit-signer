@@ -8,6 +8,7 @@ import tarfile
 from urllib.parse import urlparse
 import zipfile
 import requests
+import oyaml as yaml
 
 # Generate .env file (if not exist) with default config settings
 def write_default_env_file(default_values):
@@ -197,3 +198,13 @@ def validate_mnemonic(mnemonic):
         return True
     else:
         return False
+    
+# Read yaml file and return object
+def read_yaml_file(file_path):
+    with open(file_path, 'r') as file:
+        try:
+            yaml_data = yaml.safe_load(file)
+            return yaml_data
+        except yaml.YAMLError as e:
+            print(f"Error reading YAML file: {e}")
+            return None

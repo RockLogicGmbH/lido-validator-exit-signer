@@ -5,7 +5,6 @@ import platform
 import subprocess
 from dotenv import load_dotenv
 from functions import *
-import oyaml as yaml
 
 #
 # CONFIG
@@ -52,15 +51,6 @@ else:
 #
 # MAIN
 #
-
-def read_yaml_file(file_path):
-    with open(file_path, 'r') as file:
-        try:
-            yaml_data = yaml.safe_load(file)
-            return yaml_data
-        except yaml.YAMLError as e:
-            print(f"Error reading YAML file: {e}")
-            return None
         
 # Main function
 def main():
@@ -212,7 +202,7 @@ def main():
         newmessages_total += 1
         print(f"Generated exit message for validator {validator_key} ({validator['validatorIndex']})")
     
-    # Remoe offline_preparation_json if exists
+    # Remove offline_preparation_json if exists
     if os.path.exists(offline_preparation_json):
         os.remove(offline_preparation_json)
         
