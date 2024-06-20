@@ -3,6 +3,8 @@ import getpass
 import glob
 import os
 import platform
+import re
+import subprocess
 import sys
 import tarfile
 from urllib.parse import urlparse
@@ -54,8 +56,25 @@ def install_ethdo(url,dockerized=False):
 
     # Check if ethdo is already installed
     if os.path.exists(final_ethdo_path):
-        print("Executable of ethdo already installed")
-        return final_ethdo_path
+
+        # Check version
+        process = subprocess.run(f"{final_ethdo_path} version", capture_output=True, text=True, shell=True)
+        exit_code = process.returncode
+        err = process.stderr.strip()
+        out = process.stdout.strip()
+        if exit_code != 0:
+            raise RuntimeError(f"Could not determine ethdo version ({err})")
+        ethdo_version = out
+        match = re.search(r'/v(\d+\.\d+\.\d+)/', url)
+        if match:
+            ethdo_installer_version = match.group(1)
+        else:
+            raise RuntimeError(f"Could not determine ethdo version from latest installer url ({err})")
+        
+        # If the version is equal its already installed, otherwise new version must be installed
+        if ethdo_installer_version == ethdo_version:
+            print(f"Executable v{ethdo_version} of ethdo already installed")
+            return final_ethdo_path
 
     # Download the tarball
     response = requests.get(url)
