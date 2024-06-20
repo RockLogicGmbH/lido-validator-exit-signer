@@ -530,5 +530,5 @@ def upgrade(SCRIPT_HOME_DIR):
             print(f"The exitsigner application is already at the newest version {current_version}")
             return True
     except Exception as e:
-        print("Could not get latest exitsigner release infos")
+        print("Could not get latest exitsigner release infos ({e})")
     return False
