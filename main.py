@@ -5,7 +5,7 @@ import platform
 import subprocess
 from dotenv import load_dotenv
 from functions import *
-import yaml
+import oyaml as yaml
 
 #
 # CONFIG
