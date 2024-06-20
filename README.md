@@ -84,5 +84,5 @@ python main.py
 ## Build
 
 ```
-pyinstaller --onefile --name exitsigner main.py
+poetry run pyinstaller --add-data "pyproject.toml:." --onefile --name exitsigner main.py
 ```

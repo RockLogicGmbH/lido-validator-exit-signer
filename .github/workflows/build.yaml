@@ -43,7 +43,7 @@ jobs:
           poetry install --no-root
       - name: Build CLI
         run: |
-          poetry run pyinstaller --onefile --name exitsigner-${{ matrix.os }} main.py
+          poetry run pyinstaller --add-data "pyproject.toml:." --onefile --name exitsigner-${{ matrix.os }} main.py
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v2
         with:

@@ -14,7 +14,91 @@ import oyaml as yaml
 import hashlib
 import validators
 import semver
+from pathlib import Path
+import toml
+import semver
+from semver import Version
+from typing import Optional, Tuple
 
+# SemVer class to compare semantic versions
+# Requires Python semver package
+# Examples:
+# print(SemVer.compare("1.3.2", "1.3.3")) # -1
+# print(SemVer.compare("1.3.3", "1.3.3")) # 0
+# print(SemVer.compare("1.3.3", "1.3.2")) # 1
+class SemVer:
+    # Cleanup string for semantic versions
+    @staticmethod
+    def get_version_tuple(version: str) -> Tuple[Version, Optional[str]]:
+        """
+        Convert an incomplete version string into a semver-compatible Version
+        object
+
+        * Tries to detect a "basic" version string (``major.minor.patch``).
+        * If not enough components can be found, missing components are
+            set to zero to obtain a valid semver version.
+
+        :param str version: the version string to convert
+        :return: a tuple with a :class:`Version` instance (or ``None``
+            if it's not a version) and the rest of the string which doesn't
+            belong to a basic version.
+        :rtype: tuple(:class:`Version` | None, str)
+        """
+        BASEVERSION = re.compile(
+            r"""[vV]?
+                (?P<major>0|[1-9]\d*)
+                (\.
+                (?P<minor>0|[1-9]\d*)
+                (\.
+                    (?P<patch>0|[1-9]\d*)
+                )?
+                )?
+            """,
+            re.VERBOSE,
+        )
+        match = BASEVERSION.search(version)
+        if not match:
+            return (None, version)
+
+        ver = {
+            key: 0 if value is None else value for key, value in match.groupdict().items()
+        }
+        ver = Version(**ver)
+        rest = match.string[match.end() :]  # noqa:E203
+        return ver, rest
+
+    # Helper for semantic versions
+    @staticmethod
+    def version_tuple_to_string(version_tuple):
+        version_str = f"{version_tuple[0].major}.{version_tuple[0].minor}.{version_tuple[0].patch}" \
+                    f"{'-' + version_tuple[0].prerelease if version_tuple[0].prerelease else ''}" \
+                    f"{'.' + version_tuple[0].build if version_tuple[0].build else ''}" \
+                    f"{version_tuple[1]}"
+        return version_str
+
+    # Compare version (in a none fully strict fashion)
+    @staticmethod
+    def compare(version1, version2):
+        version1_tuple = SemVer.get_version_tuple(version1)
+        version2_tuple = SemVer.get_version_tuple(version2)
+        version1 = SemVer.version_tuple_to_string(version1_tuple)
+        version2 = SemVer.version_tuple_to_string(version2_tuple)
+        return semver.compare(version1, version2)
+
+#
+# FUNCTIONS
+#
+
+# Custom filter to compare semantic versions
+# Returns True if current_version is lower than most_recent_version
+# Examples:
+# print(is_lower_than("1.3.2", "1.3.3")) # True (Internal: -1)
+# print(is_lower_than("1.3.3", "1.3.3")) # False (Internal: 0)
+# print(is_lower_than("1.3.3", "1.3.2")) # False (Internal: 1)
+def is_lower_than(current_version, most_recent_version):
+    return SemVer.compare(current_version, most_recent_version) < 0
+
+# Check if string is a semantic version at all
 def is_semantic_version(version):
     try:
         semver.parse_version_info(version)
@@ -271,6 +355,12 @@ def script_home_dir():
         script_dir = os.path.dirname(os.path.realpath(__file__))
     return script_dir
 
+# Returns true if running in a bundled executable (e.g., created by PyInstaller)
+def is_executable():
+    if getattr(sys, 'frozen', False):
+        return True
+    return False
+
 # Return true if user is elevated (sudo/root/admin) in win/lin/mac
 def is_elevated_user():
     system = platform.system()
@@ -326,3 +416,119 @@ def read_yaml_file(file_path):
         except yaml.YAMLError as e:
             print(f"Error reading YAML file: {e}")
             return None
+        
+
+# Get infos of "latest" release from "owner/repo" via GitHub API
+# # Examples: 
+# github_owner = "RockLogicGmbH"
+# github_repo = "lido-validator-exit-signer"
+# github_keys = ["tag_name", "name", "draft", "prerelease", "body"]
+# result = get_latest_release_info(github_owner,github_repo)
+# print(result)
+# print(result["tag_name"])
+# result = get_latest_release_info(github_owner,github_repo,github_keys)
+# print(result)
+# print(result["tag_name"])
+# sys.exit(3)
+def get_latest_release_info(owner, repo, keys = [], timeout=5, token="", silent=False, raiseEx=False):
+    if repo == "notifications":
+        if not silent:
+            print(f"Avoid to fetch latest release info for {owner}/{repo}")
+        return None
+    try:
+        url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+        headers = {"Accept": "application/vnd.github.v3+json"}
+        if token:
+            headers["Authorization"] = f"token {token}"
+        response = requests.get(url,timeout=timeout,headers=headers)
+        if response.status_code == 200:
+            release_info = response.json()
+            return {key: release_info.get(key) for key in keys} if len(keys) > 0 else release_info
+        else:
+            err = f"Failed to fetch latest release info for {owner}/{repo}. Status code: {response.status_code}"
+            if raiseEx:
+                raise Exception(err)
+            if not silent:
+                print(err)
+            return None
+    except Exception as e:
+        err = f"Failed to fetch latest release info for {owner}/{repo} ({e})"
+        if raiseEx:
+            raise Exception(err)
+        if not silent:
+            print(err)
+        return None
+    
+
+# Get project version from toml
+# https://stackoverflow.com/a/78082532    
+def get_project_version():
+    version = "0.0.0"
+    # adopt path to your pyproject.toml
+    pyproject_toml_file = Path(__file__).parent / "pyproject.toml"
+    if pyproject_toml_file.exists() and pyproject_toml_file.is_file():
+        data = toml.load(pyproject_toml_file)
+        # check project.version
+        if "project" in data and "version" in data["project"]:
+            version = data["project"]["version"]
+        # check tool.poetry.version
+        elif "tool" in data and "poetry" in data["tool"] and "version" in data["tool"]["poetry"]:
+            version = data["tool"]["poetry"]["version"]
+    return version
+
+# Get latest release infos for exitsigner based on OS
+def get_latest_release_infos_for_os(github_owner = "RockLogicGmbH", github_repo = "lido-validator-exit-signer"):
+    release = get_latest_release_info(github_owner,github_repo)
+    system_platform = platform.system()
+    if system_platform == "Darwin":
+        find = "macos"
+    elif system_platform == "Windows":
+        find = "windows"
+    else:
+        find = "ubuntu"
+    if release["assets_url"]:
+        response = requests.get(release["assets_url"])
+        assets = response.json()
+        #print(data)
+        osasset = None
+        for asset in assets:
+            #print(asset["name"])
+            #print(f"exitsigner-{find}-latest")
+            if asset["name"] == f"exitsigner-{find}-latest" or asset["name"] == f"cli-{find}-latest":
+                osasset = asset
+                break;
+    return {
+        "version": release["tag_name"], # Version a.k.a "tag_name" of the latest release
+        "release": release, # All infos of the latest release
+        "assets": assets,   # assets for this release
+        "asset": osasset,   # asset associated to the OS the application is currently runnign on (None if undetected)
+        "download": osasset["browser_download_url"] if osasset else None,   # Asset download URL (None if undetected)
+    }
+
+# Upgrade existsigner
+def upgrade(SCRIPT_HOME_DIR):
+    local_file_path = os.path.join(SCRIPT_HOME_DIR,"exitsigner")
+    if not os.path.exists(local_file_path):
+        print("Invalid SCRIPT_HOME_DIR specified")
+        return False
+    try:
+        latest_release_for_os = get_latest_release_infos_for_os()
+        current_version = get_project_version()
+        # print(latest_release_for_os["version"])
+        # print(latest_release_for_os["download"])
+        # print(current_version)
+        if is_lower_than(current_version, latest_release_for_os["version"]):
+            print("Uprading exitsigner...")
+            # Download and overwrite the binary
+            url = latest_release_for_os["download"];
+            response = requests.get(url)
+            with open(local_file_path, "wb") as f:
+                f.write(response.content)
+                print(f"Successfully upgraded exitsigner to version {latest_release_for_os['version']}")
+                return True
+        else:
+            print(f"The exitsigner application is already at the newest version {current_version}")
+            return True
+    except Exception as e:
+        print("Could not get latest exitsigner release infos")
+    return False

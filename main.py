@@ -54,7 +54,7 @@ else:
 #
 # MAIN
 #
-        
+
 # Main function
 def main():
 
@@ -72,9 +72,18 @@ def main():
     parser.add_argument('--mnemonic', type=str, help='Specify the mnemonic directly (optional and strictly *not* recommended)')
     parser.add_argument('--signpercent', nargs='?', const=True, type=int, default=SIGN_PERCENT, help=f'Percent of validators managed by the operator to sign exit messages for (Default: {SIGN_PERCENT})')
     parser.add_argument('--writeconfig', action='store_true', help='Write .env file (if not exist) with default config values')
+    parser.add_argument('--upgrade', action='store_true', help='Upgrade exitsigner application')
+    parser.add_argument('--version', action='store_true', help='Get current version of the exitsigner')
 
     # Parse arguments
     args = parser.parse_args()
+
+    # Handle --signpercent argument
+    if args.signpercent:
+        if not is_whole_number(args.signpercent) or args.signpercent > 100 or args.signpercent < 1:
+            print("Invalid value for argument --signpercent (Expected range 1-100)")
+            return
+        SIGN_PERCENT=args.signpercent
 
     # Handle --writeconfig argument
     if args.writeconfig:
@@ -84,12 +93,18 @@ def main():
             print("Default .env file already exists")
         return
     
-    # Handle --signpercent argument
-    if args.signpercent:
-        if not is_whole_number(args.signpercent) or args.signpercent > 100 or args.signpercent < 1:
-            print("Invalid value for argument --signpercent (Expected range 1-100)")
+    # Handle --upgrade argument
+    if args.upgrade:
+        if not is_executable():
+            print("Upgrades only run when packed as executable")
             return
-        SIGN_PERCENT=args.signpercent
+        upgrade(SCRIPT_HOME_DIR)
+        return
+    
+    # Handle --version argument
+    if args.version:
+        print(get_project_version())
+        return
 
     # Check if user has elevated permission
     if not is_elevated_user():
