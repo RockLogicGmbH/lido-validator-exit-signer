@@ -43,7 +43,7 @@ jobs:
           poetry install --no-root
       - name: Build CLI
         run: |
-          poetry run pyinstaller --add-data "pyproject.toml:." --onefile --name exitsigner-${{ matrix.os }} main.py
+          poetry run pyinstaller --add-data "pyproject.toml:." --onefile --name exitsigner-${{ matrix.os }} exitsigner.py
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v2
         with:
@@ -68,6 +68,29 @@ jobs:
           APP_VERSION=$(grep -E '^\s*version\s*=' pyproject.toml | awk -F '=' '{gsub(/[[:space:]]*/, "", $2); gsub(/"/, "", $2); print $2}')
           echo "version=$APP_VERSION" >> "$GITHUB_OUTPUT"
         shell: bash
+
+      # Build and push docker image(s)
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push Docker release images
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/exitsigner-web:latest,${{ vars.DOCKERHUB_NAMESPACE }}/exitsigner-web:${{github.ref_name}}
+          context: ./
+        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Build and push Docker draft image
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: ${{ vars.DOCKERHUB_NAMESPACE }}/exitsigner-web:${{ steps.variables.outputs.version }}-draft
+          context: ./
+        if: startsWith(github.ref, 'refs/tags/v') == false
 
       # Download artifacts from build
       - name: create dist folder
@@ -103,6 +126,12 @@ jobs:
         with:
           tag: "${{ steps.variables.outputs.version }}-draft"
           name: "${{ steps.variables.outputs.version }}"
+          body: |
+            Get Docker image
+            ```
+            docker pull ${{ vars.DOCKERHUB_NAMESPACE }}/exitsigner-web:${{ steps.variables.outputs.version }}-draft
+            ```
+            - [DockerHub @ ${{ steps.variables.outputs.version }}-draft](https://hub.docker.com/r/${{ vars.DOCKERHUB_NAMESPACE }}/exitsigner-web/tags)
           skipIfReleaseExists: true
           updateOnlyUnreleased: true
           artifacts: dist/*

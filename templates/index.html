@@ -1,0 +1,169 @@
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    margin: 0;
+    padding: 30px;
+    overflow: hidden;
+  }
+  #status-msg {
+    border: 1px solid black;
+    padding: 4px;
+    overflow-y: auto; /* Scroll only vertically */
+    flex: 1; /* Allow the status box to grow and take up remaining space */
+    min-height: 0; /* Prevent the box from growing too large in some scenarios */
+  }
+</style>
+<body>
+  <h1>Exit Signer</h1>
+
+  <!-- Mnemonic Input Form -->
+  <form id="mnemonic-form">
+    <label for="mnemonic">Enter Mnemonic:</label><br />
+    <input
+      type="password"
+      id="mnemonic"
+      name="mnemonic"
+      placeholder="Your mnemonic"
+    />
+    <button type="button" id="toggle-visibility">Show</button>
+    <br /><br />
+    <button type="button" id="start-btn">Start</button>
+    <button type="button" id="abort-btn">Abort</button>
+  </form>
+  <p id="status-msg">
+    aaaaa<br /><br /><br /><br /><br /><br /><br />
+    aaaaa<br /><br /><br /><br /><br /><br /><br />
+    aaaaa<br /><br /><br /><br /><br /><br /><br />
+    aaaaa<br /><br /><br /><br /><br /><br /><br />
+    aaaaa<br /><br /><br /><br /><br /><br /><br />
+    aaaaa<br /><br /><br /><br /><br /><br /><br />
+    aaaaa<br /><br /><br /><br /><br /><br /><br />
+    aaaaa<br /><br /><br /><br /><br /><br /><br />
+    aaaaa<br /><br /><br /><br /><br /><br /><br />
+  </p>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const startButton = document.getElementById("start-btn");
+      const abortButton = document.getElementById("abort-btn");
+      const toggleVisibilityButton =
+        document.getElementById("toggle-visibility");
+      const mnemonicInput = document.getElementById("mnemonic");
+      const statusMsg = document.getElementById("status-msg");
+      let timer;
+
+      function scrollToBottom() {
+        console.log("scrollToBottom START" + statusMsg.scrollHeight);
+        statusMsg.scrollTop = statusMsg.scrollHeight; // Scroll to the bottom
+        console.log("scrollToBottom DONE to " + statusMsg.scrollHeight);
+      }
+
+      // Toggle Visibility Function
+      toggleVisibilityButton.addEventListener("click", function () {
+        if (mnemonicInput.type === "password") {
+          mnemonicInput.type = "text"; // Show the mnemonic
+          toggleVisibilityButton.innerText = "Hide"; // Change button text to "Hide"
+        } else {
+          mnemonicInput.type = "password"; // Hide the mnemonic
+          toggleVisibilityButton.innerText = "Show"; // Change button text to "Show"
+        }
+      });
+
+      // Start Task Function
+      startButton.addEventListener("click", function () {
+        if (timer) clearTimeout(timer);
+
+        const mnemonic = document.getElementById("mnemonic").value;
+
+        if (mnemonic.trim() === "") {
+          statusMsg.innerText = "Please enter the mnemonic.";
+          return;
+        }
+
+        statusMsg.innerText = "Starting the signing process...";
+
+        // Send mnemonic to the server using fetch
+        fetch("/start", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            mnemonic: mnemonic,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            statusMsg.innerText = "Task started. Checking status...";
+            mnemonicInput.value = "";
+          })
+          .catch((error) => {
+            statusMsg.innerText = "Error starting task: " + error;
+          })
+          .finally(() => {
+            timer = setTimeout(checkStatus, 1000);
+          });
+      });
+
+      // Abort Task Function
+      abortButton.addEventListener("click", function () {
+        if (timer) clearTimeout(timer);
+        fetch("/abort")
+          .then((response) => response.json())
+          .then((data) => {
+            statusMsg.innerText = data.msg;
+            startButton.disabled = false;
+          })
+          .catch((error) => {
+            statusMsg.innerText = "Error aborting task: " + error;
+          })
+          .finally(() => {
+            timer = setTimeout(checkStatus, 5000);
+          });
+      });
+
+      // Check Task Status Function
+      function checkStatus() {
+        if (timer) clearTimeout(timer);
+        fetch("/status")
+          .then((response) => response.json())
+          .then((data) => {
+            if (!data.task_running) {
+              startButton.disabled = false; // Enable Start button when task is not running
+              //statusMsg.innerText = "Ready to start";
+              console.log(data.output);
+              if (data.output) {
+                statusMsg.innerText = data.output;
+              } else {
+                statusMsg.innerText = "Ready to start";
+              }
+            } else {
+              startButton.disabled = true; // Disable Start button when task is running
+              //statusMsg.innerText = "Task is currently running...";
+              console.log(data.output);
+              if (data.output) {
+                statusMsg.innerText = data.output;
+              } else {
+                statusMsg.innerText = "Task is currently running...";
+              }
+            }
+          })
+          .catch((error) => {
+            statusMsg.innerText = "Error checking status: " + error;
+          })
+          .finally(() => {
+            scrollToBottom();
+            timer = setTimeout(checkStatus, 2000);
+          });
+      }
+
+      // Initial status check on page load
+      checkStatus();
+    });
+  </script>
+</body>

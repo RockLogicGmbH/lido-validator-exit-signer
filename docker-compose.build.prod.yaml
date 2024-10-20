@@ -1,0 +1,9 @@
+# Build production images with names from docker-compose.yaml and ignore docker-compose.override.yaml
+# Usage:
+# sudo docker compose -f docker-compose.yaml -f docker-compose.build.yaml build [<service>, ..]
+services:
+  # Override Web
+  web:
+    pull_policy: build
+    build: .
+    # platform: linux/amd64

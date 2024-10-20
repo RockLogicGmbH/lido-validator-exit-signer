@@ -73,16 +73,74 @@ To re-attach to existing screen session run:
 screen -S exitsig -dr
 ```
 
+<!--
+## Web UI
+
+Instead of running the exitsigner application on the command line you can also run it via Docker thru a simple WEB UI.
+This implies that Docker has to be installed on your system to make this work.
+
+1. Download [docker-compose.yaml](./docker-compose.yaml)
+2. Download [.env.example](./.env.example) to `.env`
+3. Configue a secure connection and Stereum path
+
+To make sure the connection to the WEB UI is secure you need to uncomment the `proxy` container in `docker-compose.yaml`.
+Set the IP address the service should be available for `NXCT_SERVICE_HOST_1`. If this IP address is publicly available and you have a domain pointed on it, set the domain name instead and you will automatically get official certs from Let's Encrypt.
+
+If you run the exitsigner on a host that is managed by [Stereum](https://github.com/stereum-dev/ethereum-node) also make sure tu uncomment the ` # - /opt/stereum:/opt/stereum` volume of the `web` container. Otherwise you need to configure the app via `.env` file!
+
+Note that the `.env` file must exist, even if it is just empty, no matter what!
+
+4. Start the Web UI
+
+```
+sudo docker compuse up -d
+```
+
+Then open in your browser:
+
+- https://<YourDomainOrIp>
+-->
+
 # Development
+
+Dev commands requires Python 3.10 with Poetry and venv activated!
+
+To build the Web UI locally you also need Docker installed.
+
+## Exitsigner CLI
+
+```
+python exitsigner.py
+```
+
+### Build
+
+```
+poetry run pyinstaller --add-data "pyproject.toml:." --onefile --name exitsigner exitsigner.py
+```
+
+## Exitsigner Web UI
 
 ```
 python main.py
 ```
 
-> Requires Python 3.10 with Poetry and venv activated!
-
-## Build
+### Build
 
 ```
-poetry run pyinstaller --add-data "pyproject.toml:." --onefile --name exitsigner main.py
+docker compose build
+```
+
+Start
+
+```
+docker compose up -d
+```
+
+- http://localhost:7524
+
+Stop
+
+```
+docker compose down
 ```

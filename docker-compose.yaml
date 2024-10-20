@@ -1,0 +1,52 @@
+services:
+  web:
+    container_name: exitsigner-web
+    image: rocklogicgmbh/exitsigner-web:latest
+    restart: on-failure
+    # ports:
+    #   - 80:7524
+    volumes:
+      - ./certs:/app/certs
+      # Uncomment the volume below (and adjust if needed) if you run a Lido Ejector service with Stereum on the same host
+      # - /opt/stereum:/opt/stereum
+    env_file: .env
+    # environment:
+    #   SV_ADDR: 0.0.0.0
+    #   SV_PORT: 7524
+    #   SV_WORKERS: None
+    #   SV_SSL_CERTFILE: certs/selfsigned.crt
+    #   SV_SSL_KEYFILE: certs/selfsigned.key
+    #   SV_SSL_KEYFILE_PASS:
+
+  # # Optional (for production usage only):
+  # # Uncomment the the below container and change 127.0.0.1 to your public IP or domain
+  # # If the domain is pointed to to the local machine, Let's Encrypt certs are auto generated
+  # # otherwise only self signed certs are generated for the public IP.
+  # # Make sure that ports for the "web" container above are commented out, the variables
+  # # SV_SSL_CERTFILE, SV_SSL_KEYFILE are undefined/empty and delete docker-compose.override.yaml
+  # proxy:
+  #   container_name: proxy
+  #   image: rocklogicgmbh/nginxcrypt:latest
+  #   depends_on:
+  #     - web
+  #   restart: always
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   # tty: true # only needed for zerossl if NXCT_SERVICE_EMAIL is given (currently disabled anyway!)
+  #   volumes:
+  #     - ./.volumes/proxy/certs:/certs
+  #     - ./.volumes/proxy/conf:/conf
+  #   # env_file: .env
+  #   environment:
+  #     - NXCT_SERVICE_HOST_1=127.0.0.1
+  #     - NXCT_SERVICE_PROXY_1=web:7524
+  #     - NXCT_SERVICE_KEYLENGTH=ec-384 # default 4096 (and must be 2048 at least!)
+  #     - NXCT_SERVICE_EMAIL=your@email.tld
+  #     - NXCT_SERVICE_DHPARAM=2048 # default 2048 (and must be 2048 at least!)
+  #     - NXCT_SERVICE_DRYRUN=false
+  #     - NXCT_SERVICE_DELTEOUTDATEDCERTS=true # default false
+  #     - NXCT_SERVICE_ALLOWUNKNOWNDOMAINS=false
+  #     - NXCT_SERVICE_CERTDIRPERMS=600 # default 777 (use 600 or similar in production)
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway" # required on Linux!

@@ -1,0 +1,11 @@
+services:
+  # Override Web
+  web:
+    image: dev/exitsigner-web:latest
+    # pull_policy: build
+    build: .
+    # platform: linux/amd64
+    # Uncomment command below for debugging inside the container
+    # command: bash -c "while true; do sleep 1; done" # Infinite loop to keep container live doing nothing
+    ports:
+      - 7524:7524
