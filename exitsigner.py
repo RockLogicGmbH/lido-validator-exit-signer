@@ -287,7 +287,7 @@ def signForRemoteServer(args):
     say("Generate offline-preparation.json, please be patient..")
     offline_preparation_json = os.path.join(EXITSIGNER_TEMP_DIR, 'offline-preparation.json')
     say(f"offline_preparation_json: {offline_preparation_json}")
-    process = subprocess.run(f"{ethdo_path} --connection={NODE_URL} validator exit --json --verbose --debug --prepare-offline", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
+    process = subprocess.run(f"{ethdo_path} --timeout 30m --connection={NODE_URL} validator exit --json --verbose --debug --prepare-offline", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
     exit_code = process.returncode
     err = process.stderr.strip()
     out = process.stdout.strip()
@@ -304,7 +304,7 @@ def signForRemoteServer(args):
         validator_key = validator['key']
         save_path_local = os.path.join(newmessages_tempdir, f"{validator_key}.json")
         save_path_remote = toLinPath(os.path.join(VALIDATOR_EJECTOR_MESSAGE_FOLDER, f"{validator_key}.json"))
-        process = subprocess.run(f"{ethdo_path} --connection={NODE_URL} validator exit --json --verbose --debug --offline --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path_local}'", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
+        process = subprocess.run(f"{ethdo_path} --timeout 30m --connection={NODE_URL} validator exit --json --verbose --debug --offline --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path_local}'", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
         exit_code = process.returncode
         err = process.stderr.strip()
         out = process.stdout.strip()
@@ -622,7 +622,7 @@ def main():
     # Generate offline-preparation.json (this will generate all infos needed)
     say("Generate offline-preparation.json, please be patient..")
     offline_preparation_json = os.path.join(EXITSIGNER_TEMP_DIR, 'offline-preparation.json')
-    process = subprocess.run(f"{ethdo_path} --connection={NODE_URL} validator exit --json --verbose --debug --prepare-offline", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
+    process = subprocess.run(f"{ethdo_path} --timeout 30m --connection={NODE_URL} validator exit --json --verbose --debug --prepare-offline", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
     exit_code = process.returncode
     err = process.stderr.strip()
     out = process.stdout.strip()
@@ -638,7 +638,7 @@ def main():
         validator_key = validator['key']
         save_path_temp = os.path.join(newmessages_tempdir, f"{validator_key}.json")
         save_path_live = os.path.join(VALIDATOR_EJECTOR_MESSAGE_FOLDER, f"{validator_key}.json")
-        process = subprocess.run(f"{ethdo_path} --connection={NODE_URL} validator exit --json --verbose --debug --offline --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path_temp}'", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
+        process = subprocess.run(f"{ethdo_path} --timeout 30m --connection={NODE_URL} validator exit --json --verbose --debug --offline --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path_temp}'", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
         exit_code = process.returncode
         err = process.stderr.strip()
         out = process.stdout.strip()
