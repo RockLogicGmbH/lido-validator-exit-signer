@@ -10,6 +10,7 @@ import uvicorn
 from config.settings import settings
 from config.logger import LOG_LEVEL, UVICORN_LOGGING_CONFIG, setup_logging
 from loguru import logger
+from functions import say
 
 #
 # CONFIG
@@ -42,7 +43,7 @@ def status():
     msg = "Ready for new action."
     if task_running:
         global process
-        print(process.pid,flush=True)
+        say(process.pid)
         msg = f"Task is currently running (PID: {process.pid})."
     with buffer_lock:
         return jsonify({
@@ -89,7 +90,7 @@ def abort_task():
             # #process.terminate()
             # time.sleep(1)
             # if process.poll() is None:
-            #     print("Process did not terminate, force killing...", flush=True)
+            #     say("Process did not terminate, force killing...")
             #     #process.kill()
             #     os.kill(process.pid, signal.SIGKILL)
             # if process.poll() is not None:
@@ -117,14 +118,16 @@ def run_task(mnemonic):
     #task_running = True
     output_buffer.clear()  # Clear previous buffer
     # Existigner CLI can be a long-running task with the mnemonic
+    usedrykey = f" --drykey {settings.DRY_KEY}" if settings.DRY_KEY else ""
+    usedebug = f" --debug" if settings.UI_DEBUG else ""
     try:
         # Run exitsigner
-        print("START!!!!!", flush=True)
+        say("START!!!!!")
         # Start the process and capture stdout and stderr
         process = subprocess.Popen(
             #["python", "exitsigner.py", "--mnemonic", mnemonic],
             #f"dist/exitsigner --testing 20",
-            f"dist/exitsigner --mnemonic '{mnemonic}'",
+            f"dist/exitsigner --mnemonic '{mnemonic}'{usedrykey}{usedebug}",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             bufsize=1,  # Line buffering
@@ -135,20 +138,20 @@ def run_task(mnemonic):
         for stdout_line in iter(process.stdout.readline, ""):
             with buffer_lock:
                 output_buffer.append(stdout_line.strip())
-                print(f"OUTPUT: {stdout_line.strip()}", flush=True)  # Optionally log to console
+                say(f"OUTPUT: {stdout_line.strip()}")  # Optionally log to console
         # Handle stderr if needed
         for stderr_line in iter(process.stderr.readline, ""):
             with buffer_lock:
                 output_buffer.append(f"ERROR: {stderr_line.strip()}")
-                print(f"ERROR: {stderr_line.strip()}", flush=True)
+                say(f"ERROR: {stderr_line.strip()}")
         process.stdout.close()
         process.stderr.close()
         process.wait()  # Wait for the process to complete
-        print("COMPLETE!!!!!", flush=True)
+        say("COMPLETE!!!!!")
         task_running = False
 
     except Exception as e:
-        print(f"Error running process: {e}")
+        say(f"Error running process: {e}")
     finally:
         task_running = False
 

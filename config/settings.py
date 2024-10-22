@@ -1,9 +1,21 @@
+import os
 import platform
 import sys
 from typing import Optional, Union
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from .validate import validate
+
+# Custom validator to interpret "None", "True", and "False" strings
+def interpret_none_or_bool_string(v):
+    val = v.lower().strip() if isinstance(v,str) else v
+    if val == "none":
+        return None
+    elif val == "true":
+        return True
+    elif val == "false":
+        return False
+    return v
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -57,6 +69,24 @@ class Settings(BaseSettings):
     SV_SSL_KEYFILE_PASS: str = ""
 
     #
+    # SSH (for remote tasks on a server where the Validator Ejector is installed)
+    #
+
+    # SSH connection details
+    VE_SSH_HOSTNAME: str | None = None
+    VE_SSH_USERNAME: str | None = None
+    VE_SSH_KEYFILE: str | None = None
+    VE_SSH_PASSWORD: str | None = None
+    VE_SSH_TIMEOUT: int = 3
+
+    #
+    # DRY RUN AND EBUG
+    #
+
+    DRY_KEY: str = ""
+    UI_DEBUG: bool = False # TODO: Rename and merge with args.debug!
+        
+    #
     # DISCORD
     #
 
@@ -85,9 +115,30 @@ class Settings(BaseSettings):
     DOCKERIZED: str = Field('', alias='__DOCKERIZED__') # env var "__DOCKERIZED__" without prefix
     STARTSCRIPT: str = Field('', alias='__STARTSCRIPT__') # env var "__STARTSCRIPT__" without prefix
 
+    #
+    # None, True, False
+    #
 
+    # Custom validator to interpret "None", "True", and "False" strings
+    @field_validator(
+        'VE_SSH_HOSTNAME',
+        'VE_SSH_USERNAME',
+        'VE_SSH_KEYFILE',
+        'VE_SSH_PASSWORD',
+        'VE_SSH_TIMEOUT',
+        'OPERATOR_ID',
+        'UI_DEBUG'
+    )
+    def validate_none_or_bool_string(cls, v):
+        return interpret_none_or_bool_string(v)
+
+
+
+# Access to the original default values
+default_settings = Settings.model_construct()
+
+# Settings
 settings = Settings()
-
 
 # Define ETHDO_URL by ETHDO_VERSION
 settings.ETHDO_VERSION = settings.ETHDO_VERSION.lower().replace("v","")
@@ -99,3 +150,6 @@ elif system_platform == "Windows":
 else:
     ETHDO_URL = f"https://github.com/wealdtech/ethdo/releases/download/v{settings.ETHDO_VERSION}/ethdo-{settings.ETHDO_VERSION}-linux-amd64.tar.gz"
 settings.ETHDO_URL = ETHDO_URL
+
+# Replace home dir costant
+settings.VE_SSH_KEYFILE = settings.VE_SSH_KEYFILE.replace("{HOME}", os.path.expanduser("~")) if settings.VE_SSH_KEYFILE else settings.VE_SSH_KEYFILE 

@@ -19,6 +19,7 @@ loguru = "^0.7.2"
 uvicorn = "^0.32.0"
 pydantic-settings = "^2.6.0"
 asgiref = "^3.8.1"
+paramiko = "^3.5.0"
 
 [build-system]
 requires = ["poetry-core"]

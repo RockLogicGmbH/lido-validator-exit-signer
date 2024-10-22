@@ -4,11 +4,14 @@ import glob
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 from urllib.parse import urlparse
 import zipfile
+import paramiko
 import requests
 import oyaml as yaml
 import hashlib
@@ -23,9 +26,9 @@ from typing import Optional, Tuple
 # SemVer class to compare semantic versions
 # Requires Python semver package
 # Examples:
-# print(SemVer.compare("1.3.2", "1.3.3")) # -1
-# print(SemVer.compare("1.3.3", "1.3.3")) # 0
-# print(SemVer.compare("1.3.3", "1.3.2")) # 1
+# say(SemVer.compare("1.3.2", "1.3.3")) # -1
+# say(SemVer.compare("1.3.3", "1.3.3")) # 0
+# say(SemVer.compare("1.3.3", "1.3.2")) # 1
 class SemVer:
     # Cleanup string for semantic versions
     @staticmethod
@@ -89,12 +92,16 @@ class SemVer:
 # FUNCTIONS
 #
 
+# Flush all output function
+def say(txt):
+    print(txt,flush=True)
+
 # Custom filter to compare semantic versions
 # Returns True if current_version is lower than most_recent_version
 # Examples:
-# print(is_lower_than("1.3.2", "1.3.3")) # True (Internal: -1)
-# print(is_lower_than("1.3.3", "1.3.3")) # False (Internal: 0)
-# print(is_lower_than("1.3.3", "1.3.2")) # False (Internal: 1)
+# say(is_lower_than("1.3.2", "1.3.3")) # True (Internal: -1)
+# say(is_lower_than("1.3.3", "1.3.3")) # False (Internal: 0)
+# say(is_lower_than("1.3.3", "1.3.2")) # False (Internal: 1)
 def is_lower_than(current_version, most_recent_version):
     return SemVer.compare(current_version, most_recent_version) < 0
 
@@ -137,19 +144,23 @@ def sha256_hash_file(filename):
         return hex_digest
 
     except FileNotFoundError:
-        print(f"File '{filename}' not found.")
+        say(f"File '{filename}' not found.")
         return None
     except IOError as e:
-        print(f"Error reading '{filename}': {e}")
+        say(f"Error reading '{filename}': {e}")
         return None
     
 # Function to download ethdo from Github
-def install_ethdo(url,dockerized=False):
+def install_ethdo(url, exitsigner_tmp_dir=None, dockerized=False):
     filename = os.path.basename(urlparse(url).path)
     extension = os.path.splitext(filename)[1].lower()
-    tar_file_path = f"./{filename}"
-    extracted_dir = f"./tmp"
-    final_ethdo_path =  "./ethdo" if not dockerized else "/usr/local/bin/ethdo"
+    temp_dir = tempfile.gettempdir()
+    if exitsigner_tmp_dir and temp_dir not in exitsigner_tmp_dir:
+        raise ValueError("Exitsigner temp directory must be inside system temp directory!")
+    tar_file_path = os.path.join(temp_dir, filename)
+    extracted_dir = os.path.join(temp_dir, "ethdo-extracted")
+    ethdo_temp_dir = exitsigner_tmp_dir if exitsigner_tmp_dir else os.path.join(temp_dir, 'ethdo-bin')
+    final_ethdo_path = os.path.join(ethdo_temp_dir, 'ethdo') if not dockerized else "/usr/local/bin/ethdo"
 
     # Check if ethdo is already installed
     if os.path.exists(final_ethdo_path):
@@ -170,7 +181,7 @@ def install_ethdo(url,dockerized=False):
         
         # If the version is equal its already installed, otherwise new version must be installed
         if ethdo_installer_version == ethdo_version:
-            print(f"Executable v{ethdo_version} of ethdo already installed")
+            say(f"Executable v{ethdo_version} of ethdo already installed")
             return final_ethdo_path
 
     # Download the tarball
@@ -183,7 +194,7 @@ def install_ethdo(url,dockerized=False):
     hash = response.content.strip().decode('utf-8')
     if sha256_hash_file(tar_file_path) != hash:
         os.remove(tar_file_path)
-        print("Failed to install ethdo (Invalid tarball hash)")
+        say("Failed to install ethdo (Invalid tarball hash)")
         return None
 
     # Extract the file based on the extension
@@ -195,7 +206,7 @@ def install_ethdo(url,dockerized=False):
             zip_ref.extractall(extracted_dir)
     else:
         os.remove(tar_file_path)
-        print("Failed to install ethdo (Unsupported file format)",extension)
+        say("Failed to install ethdo (Unsupported file format)",extension)
         return None
 
     # Move the extracted binary to /usr/local/bin
@@ -205,7 +216,7 @@ def install_ethdo(url,dockerized=False):
     # Clean up - remove the tarball and extracted directory
     os.remove(tar_file_path)
     os.rmdir(extracted_dir)
-    print("Successfully installed ethdo executable")
+    say("Successfully installed ethdo executable")
     return final_ethdo_path
 
 # Auto detect validatorejector home directory
@@ -224,9 +235,9 @@ def detect_validatorejector_directory(expected_home_directory="/opt/stereum"):
 
     # Warn on multiple matches
     if len(matching_folders) > 1:
-        print(f"Warning: Found multiple validatorejector directories in {directory_path}. Using the first match.")
+        say(f"Warning: Found multiple validatorejector directories in {directory_path}. Using the first match.")
         for folder in matching_folders:
-            print(f"Found folder: {folder}")
+            say(f"Found folder: {folder}")
 
     # Return the first match (or None if no match)
     return matching_folders[0] if matching_folders else None
@@ -234,19 +245,19 @@ def detect_validatorejector_directory(expected_home_directory="/opt/stereum"):
 # Check if given num is numeric and a whole number
 # Note that also string "3" is considered a whole number alson as strict is False (default)
 # Test cases:
-# print(is_whole_number(3))           # True
-# print(is_whole_number(1.5))         # False
-# print(is_whole_number("3"))         # True (strict=False)
-# print(is_whole_number("1.5"))       # False (strict=False)
-# print(is_whole_number("3.0"))       # True (strict=False)
-# print(is_whole_number("abc"))       # False
-# print(is_whole_number(True))        # False
-# print(is_whole_number(None))        # False
-# print("--- Strict mode ---")
-# print(is_whole_number("3", strict=True))       # False (strict=True)
-# print(is_whole_number("1.5", strict=True))     # False (strict=True)
-# print(is_whole_number("3.0", strict=True))     # False (strict=True)
-# print(is_whole_number(True, strict=True))      # False (strict=True)
+# say(is_whole_number(3))           # True
+# say(is_whole_number(1.5))         # False
+# say(is_whole_number("3"))         # True (strict=False)
+# say(is_whole_number("1.5"))       # False (strict=False)
+# say(is_whole_number("3.0"))       # True (strict=False)
+# say(is_whole_number("abc"))       # False
+# say(is_whole_number(True))        # False
+# say(is_whole_number(None))        # False
+# say("--- Strict mode ---")
+# say(is_whole_number("3", strict=True))       # False (strict=True)
+# say(is_whole_number("1.5", strict=True))     # False (strict=True)
+# say(is_whole_number("3.0", strict=True))     # False (strict=True)
+# say(is_whole_number(True, strict=True))      # False (strict=True)
 def is_whole_number(num, strict=False):
     if isinstance(num, bool):
         # For boolean values, return False as they are not considered whole numbers
@@ -278,9 +289,9 @@ def is_whole_number(num, strict=False):
 def get_validators_that_need_a_signed_exit_message_from_kapi(operator_id, kapi_url, percent=10):
     if not is_whole_number(operator_id):
         if operator_id:
-            print(f'Invalid operator id "{operator_id}" for KAPI request specified')
+            say(f'Invalid operator id "{operator_id}" for KAPI request specified')
         else:
-            print(f'No operator id for KAPI request specified') 
+            say(f'No operator id for KAPI request specified') 
         return False
     try:
         percent = percent if is_whole_number(percent) and percent > 0 and percent <= 100 else 10
@@ -289,20 +300,20 @@ def get_validators_that_need_a_signed_exit_message_from_kapi(operator_id, kapi_u
             jsonresp = result.json()
             if "data" in jsonresp:
                 return jsonresp
-            print(f"KAPI responded with invalid format (data key missing)")
+            say(f"KAPI responded with invalid format (data key missing)")
             return False
         else:
-            print(f"Request to KAPI failed with status code: {result.status_code}")
+            say(f"Request to KAPI failed with status code: {result.status_code}")
             return False
     except Exception as e:
-            print(f"Request to KAPI failed with error: {e}")
+            say(f"Request to KAPI failed with error: {e}")
             return False
 
 # Get first key from list where value contains "search"
 # Example
 # my_list = ["myaaaxxx", "mybbbxxx", "mycccxxx"]
-# print(get_key(my_list, "bbb"))  # Output: 1
-# print(get_key(my_list, "bbb", exact=True))  # Output: None
+# say(get_key(my_list, "bbb"))  # Output: 1
+# say(get_key(my_list, "bbb", exact=True))  # Output: None
 def get_key(lst, search, exact=False):
     for idx, item in enumerate(lst):
         if exact:
@@ -338,12 +349,12 @@ def create_directory(directory_path):
     try:
         # Create target directory & all intermediate directories if they don't exist
         os.makedirs(directory_path)
-        #print(f"Directory '{directory_path}' created successfully.")
+        #say(f"Directory '{directory_path}' created successfully.")
     except FileExistsError:
         pass
-        #print(f"Directory '{directory_path}' already exists.")
+        #say(f"Directory '{directory_path}' already exists.")
     except OSError as e:
-        print(f"Error creating directory '{directory_path}': {e}")
+        say(f"Error creating directory '{directory_path}': {e}")
 
 # Returns script home directory
 def script_home_dir():
@@ -372,7 +383,7 @@ def is_elevated_user():
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
     
     else:
-        print(f"Unsupported operating system: {system}")
+        say(f"Unsupported operating system: {system}")
         return False
     
 # Get last line from string
@@ -395,7 +406,7 @@ def get_secure_input(prompt):
         secure_input = getpass.getpass(prompt)
         return secure_input.strip()  # Strip any extra whitespace
     except Exception as e:
-        print(f"Error getting secure input: {e}")
+        say(f"Error getting secure input: {e}")
         return None
     
 # Validate MNEMONIC format
@@ -414,7 +425,7 @@ def read_yaml_file(file_path):
             yaml_data = yaml.safe_load(file)
             return yaml_data
         except yaml.YAMLError as e:
-            print(f"Error reading YAML file: {e}")
+            say(f"Error reading YAML file: {e}")
             return None
         
 
@@ -424,16 +435,16 @@ def read_yaml_file(file_path):
 # github_repo = "lido-validator-exit-signer"
 # github_keys = ["tag_name", "name", "draft", "prerelease", "body"]
 # result = get_latest_release_info(github_owner,github_repo)
-# print(result)
-# print(result["tag_name"])
+# say(result)
+# say(result["tag_name"])
 # result = get_latest_release_info(github_owner,github_repo,github_keys)
-# print(result)
-# print(result["tag_name"])
+# say(result)
+# say(result["tag_name"])
 # sys.exit(3)
 def get_latest_release_info(owner, repo, keys = [], timeout=5, token="", silent=False, raiseEx=False):
     if repo == "notifications":
         if not silent:
-            print(f"Avoid to fetch latest release info for {owner}/{repo}")
+            say(f"Avoid to fetch latest release info for {owner}/{repo}")
         return None
     try:
         url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
@@ -449,14 +460,14 @@ def get_latest_release_info(owner, repo, keys = [], timeout=5, token="", silent=
             if raiseEx:
                 raise Exception(err)
             if not silent:
-                print(err)
+                say(err)
             return None
     except Exception as e:
         err = f"Failed to fetch latest release info for {owner}/{repo} ({e})"
         if raiseEx:
             raise Exception(err)
         if not silent:
-            print(err)
+            say(err)
         return None
     
 
@@ -489,11 +500,11 @@ def get_latest_release_infos_for_os(github_owner = "RockLogicGmbH", github_repo 
     if release["assets_url"]:
         response = requests.get(release["assets_url"])
         assets = response.json()
-        #print(data)
+        #say(data)
         osasset = None
         for asset in assets:
-            #print(asset["name"])
-            #print(f"exitsigner-{find}-latest")
+            #say(asset["name"])
+            #say(f"exitsigner-{find}-latest")
             if asset["name"] == f"exitsigner-{find}-latest" or asset["name"] == f"cli-{find}-latest":
                 osasset = asset
                 break;
@@ -509,26 +520,287 @@ def get_latest_release_infos_for_os(github_owner = "RockLogicGmbH", github_repo 
 def upgrade(SCRIPT_HOME_DIR):
     local_file_path = os.path.join(SCRIPT_HOME_DIR,"exitsigner")
     if not os.path.exists(local_file_path):
-        print("Invalid SCRIPT_HOME_DIR specified")
+        say("Invalid SCRIPT_HOME_DIR specified")
         return False
     try:
         latest_release_for_os = get_latest_release_infos_for_os()
         current_version = get_project_version()
-        # print(latest_release_for_os["version"])
-        # print(latest_release_for_os["download"])
-        # print(current_version)
+        # say(latest_release_for_os["version"])
+        # say(latest_release_for_os["download"])
+        # say(current_version)
         if is_lower_than(current_version, latest_release_for_os["version"]):
-            print("Uprading exitsigner...")
+            say("Uprading exitsigner...")
             # Download and overwrite the binary
             url = latest_release_for_os["download"];
             response = requests.get(url)
             with open(local_file_path, "wb") as f:
                 f.write(response.content)
-                print(f"Successfully upgraded exitsigner to version {latest_release_for_os['version']}")
+                say(f"Successfully upgraded exitsigner to version {latest_release_for_os['version']}")
                 return True
         else:
-            print(f"The exitsigner application is already at the newest version {current_version}")
+            say(f"The exitsigner application is already at the newest version {current_version}")
             return True
     except Exception as e:
-        print("Could not get latest exitsigner release infos ({e})")
+        say("Could not get latest exitsigner release infos ({e})")
     return False
+
+# Move signed message
+def move_signed_message(save_path_temp,save_path_live,chmod=600,chown="root:root"): 
+    # First, by default adjust owner and permissions to 600/root:root on the temp file
+    if chmod and platform.system() == "Linux":
+        os.chmod(save_path_temp, int(oct(chmod), 8))
+    if chown and platform.system() == "Linux":
+        if not ":" in chown:
+            raise ValueError("Argument 'chown' must be in format 'user:group'")
+        r = chown.split(":")
+        user = r[0]
+        group = r[1]
+        shutil.chown(save_path_temp, user=user, group=group)
+        
+    # Finally, move the temp file to validator ejector directory
+    shutil.move(save_path_temp,save_path_live)
+
+    # Success
+    return True
+
+# Format drykey
+def format_drykey(drykey:str):
+    drykey = drykey.rstrip()
+    if drykey.endswith(".json"):
+        drykey = drykey[:-5]
+    if not drykey.startswith("0x"):
+        raise ValueError("Invalid drykey specified (Does not start with 0x)") 
+    if len(drykey) != 98:
+        raise ValueError("Invalid drykey specified (Length not 98 characters)")
+    validators_that_have_no_signed_exit_message = [{
+        'validatorIndex': 0, # not used anyway but keep format for the test key
+        'key': drykey
+    }]
+    return drykey, validators_that_have_no_signed_exit_message
+
+#
+# BEACON HELPER
+#
+
+# Get network name frok beacon node
+def get_network_from_beacon_node(beacon_node_url):
+    networks = {
+        "1" : "mainnet",
+        "17000" : "holesky",
+        "11155111" : "sepolia",
+    }
+    try:
+        chain_id = get_chain_id_from_beacon_node(beacon_node_url)
+        return networks.get(chain_id,"unknown")
+    except:
+        return "unknown"
+
+# Get curretn chain id from Beacon API ("/eth/v1/config/deposit_contract")
+# Mainnet = 1 | Holesky = 17000 | Sepolia = 11155111 | ....
+# https://besu.hyperledger.org/24.5.2/public-networks/concepts/network-and-chain-id
+# https://chainid.network/
+# https://github.com/ethereum-lists/chains
+def get_chain_id_from_beacon_node(beacon_node_url):
+    url = f"{beacon_node_url}/eth/v1/config/deposit_contract"
+    headers = {'accept': 'application/json'}
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        raise ValueError(response.json().get('message'))
+    chain_id = response.json().get("data", {}).get("chain_id")
+    if not chain_id:
+        raise ValueError("Key chain_id not set or empty")
+    return chain_id
+
+# Check via Beacon API if validator exists on chain of the given node url
+# Note, status "active_ongoing" is what should be expected from an active validator
+def check_validator_by_beacon_node(beacon_node_url,valudator_key,expect_status=None):
+    url = f"{beacon_node_url}/eth/v1/beacon/states/head/validators/{valudator_key}"
+    headers = {'accept': 'application/json'}
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        raise ValueError(response.json().get('message'))
+    status = response.json().get("data", {}).get("status")
+    if not status:
+        raise ValueError("Key 'status' not set or empty")
+    if expect_status and status != expect_status:
+        raise ValueError(f"Unexpected validator status '{status}' [Expected: {expect_status}]")
+    return status
+
+#
+# REMOTE STUFF
+#
+
+# Function to establish SSH connection
+def establish_ssh_connection(address, username, key_filename=None, password=None, timeout=2):
+    ssh_client = paramiko.SSHClient()
+    ssh_client.load_system_host_keys()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect(address, username=username, key_filename=key_filename, password=password, timeout=timeout)
+    return ssh_client;
+
+def get_exit_messages_to_sign_from_kapi(operator_id, kapi_url):
+    result = requests.get(f"{kapi_url}/v1/modules/1/validators/validator-exits-to-prepare/{operator_id}")
+    if result.status_code == 200:
+        jsonresp = result.json()
+        if "data" in jsonresp:
+            return jsonresp
+        say(f"KAPI reponded invalid format (data key missing)")
+        return False
+    else:
+        say(f"Request failed with status code: {result.status_code}")
+        return False
+    
+# Run ssh command(s) as root
+# Examples:
+# ssh_exec_elevated(ssh_client, "whoami")
+# ssh_exec_elevated(ssh_client, ["cd /root", "ls -la"])
+def ssh_exec_elevated(ssh_client, commands=[]):
+    if isinstance(commands, str):
+        commands = [commands]
+    if commands:
+        command = 'sudo -i bash -c "' + " && ".join(commands) + '"'
+        stdin, stdout, stderr = ssh_client.exec_command(command)
+        out = stdout.read().decode().strip()
+        err = stderr.read().decode().strip()
+        exitcode = stdout.channel.recv_exit_status()
+    else:
+        exitcode = "3"
+        out = ""
+        err = "No command specified"
+    return {
+        "exitcode": exitcode,
+        "stdout": out,
+        "stderr": err,
+    }
+
+def toLinPath(p):
+    return p.replace(os.sep,"/") if isinstance(p,str) else p
+
+# Auto detect validatorejector home directory via SSH
+def detect_validatorejector_directory_by_ssh(ssh_client,expected_home_directory="/opt/stereum"):
+
+    # Directory to search in
+    directory_path = expected_home_directory
+
+    # Define the pattern to search for
+    pattern = 'validatorejector-*'
+    #pattern = '*-*'
+
+    # Replace directory_path and pattern with forward slahes
+    # since the connection goes to a Linux host in ANY case!
+    directory_path = toLinPath(directory_path)
+    pattern = toLinPath(pattern)
+
+    #say(f"directory_path = {directory_path}")
+    #say(f"pattern = {pattern}")
+
+    # Find directories matching the pattern on Validator Ejector server
+    result = ssh_exec_elevated(ssh_client, f"find '{directory_path}' -maxdepth 1 -type d -name '{pattern}'")
+    if result["exitcode"]:
+        say(f"Coud not auto detect validatorejector directory ({result['stderr']})")
+        return None
+    #say(result["stdout"])
+    matching_folders = result["stdout"].strip().splitlines()
+
+    # Warn on multiple matches
+    if len(matching_folders) > 1:
+        say(f"Warning: Found multiple validatorejector directories in {directory_path}. Using the first match.")
+        for folder in matching_folders:
+            say(f"Found folder: {folder}")
+
+    # Return the first match (or None if no match)
+    return matching_folders[0] if matching_folders else None
+
+# Read yaml file and return object
+def read_yaml_file_by_ssh(ssh_client,file_path):
+    # Read the YAML file content remotely
+    result = ssh_exec_elevated(ssh_client, f"cat '{file_path}'")
+    if result["exitcode"]:
+        say(f"Error reading remote yaml file {file_path} ({result['stderr']})")
+        return None
+    
+    # Parse the YAML content
+    try:
+        yaml_data = yaml.safe_load(result["stdout"])
+        return yaml_data
+    except yaml.YAMLError as e:
+        say(f"Error parsing YAML content from {file_path}: {e}")
+        return None
+
+# Get all json files on remote server in given path as list
+def get_json_files_by_ssh(ssh_client,path):
+    """
+    Get a list of JSON file names from remote server matching the pattern '0x*.json' in the specified directory path.
+
+    Args:
+    - ssh_client (obj): SSH client object
+    - path (str): Directory path on the remote server where the JSON files are located.
+
+    Returns:
+    - list: List of JSON file names.
+    """
+    # Directory to search in
+    directory_path = path
+
+    # Construct the pattern to match files (0x*.json)
+    pattern = '0x*.json'
+    #pattern = '*-sdsdggd*'
+
+    # Replace directory_path and pattern with forward slahes
+    # since the connection goes to a Linux host in ANY case!
+    directory_path = toLinPath(directory_path)
+    pattern = toLinPath(pattern)
+
+    #say(f"directory_path = {directory_path}")
+    #say(f"pattern = {pattern}")
+
+    # Return the list of matching files
+    matching_files = []
+
+    # Find files matching the pattern on Validator Ejector server
+    result = ssh_exec_elevated(ssh_client, f"find '{directory_path}' -maxdepth 1 -type f -name '{pattern}'")
+    if result["exitcode"]:
+        say(f"Coud not find JSON files on remote server ({result['stderr']})")
+        # stay compatible with get_json_files and return an empty list insteadf of None
+        return matching_files
+    matching_files += result["stdout"].strip().splitlines()
+
+    # Return the list of matching files
+    return matching_files
+
+# Uplaods file via SCP/SFTP
+def upload_file_via_scp(ssh_client, local_file_path, remote_file_path, raiseExceptions = False):
+    try:
+        sftp = ssh_client.open_sftp()
+        sftp.put(local_file_path, remote_file_path)
+        sftp.close()
+        return True
+    except Exception as e:
+        if raiseExceptions:
+            raise e
+        say(f"Error uploading file: {e}")
+        return None
+
+# Upload signed message
+def upload_signed_message(ssh_client,save_path_local,save_path_remote,chmod=600,chown="root:root"): 
+    # First upload to tmp directory with prefix
+    temp_path_remote = f"/tmp/_signedmsg_" + os.path.basename(save_path_local)
+    upload_file_via_scp(ssh_client, save_path_local, temp_path_remote, raiseExceptions=True)
+ 
+    # Second, by default adjust owner and permissions to 600/root:root on the temp file
+    if chmod:
+        result = ssh_exec_elevated(ssh_client, f"chmod {chmod} '{temp_path_remote}'")
+        if result["exitcode"]:
+            raise RuntimeError(result['stderr'])
+    if chown:
+        result = ssh_exec_elevated(ssh_client, f"chown {chown} '{temp_path_remote}'")
+        if result["exitcode"]:
+            raise RuntimeError(result['stderr'])
+        
+    # Third, move the temp file as root to validator ejector directory
+    result = ssh_exec_elevated(ssh_client, f"mv '{temp_path_remote}' '{save_path_remote}'")
+    if result["exitcode"]:
+        raise RuntimeError(result['stderr'])
+
+    # Success
+    return True
