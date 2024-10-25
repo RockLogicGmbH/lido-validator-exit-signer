@@ -271,7 +271,7 @@ def main():
         validator_key = validator['key']
         #save_path = os.path.join(newmessages_tempdir, f"{validator_key}.json")
         save_path = os.path.join(VALIDATOR_EJECTOR_MESSAGE_FOLDER, f"{validator_key}.json")
-        process = subprocess.run(f"{ethdo_path} --connection={NODE_URL} validator exit --json --verbose --debug --offline --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path}'", capture_output=True, text=True, shell=True)
+        process = subprocess.run(f"{ethdo_path} --connection={NODE_URL} validator exit --json --verbose --debug --offline --max-distance=20480 --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path}'", capture_output=True, text=True, shell=True)
         exit_code = process.returncode
         err = process.stderr.strip()
         out = process.stdout.strip()
