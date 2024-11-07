@@ -8,8 +8,9 @@ services:
     volumes:
       - ${HOME}/.ssh:/root/.ssh:ro
       - ./certs:/app/certs
-      # Uncomment the volume below (and adjust if needed) if you run a Lido Ejector service with Stereum on the same host
+      # Uncomment the volumes below (and adjust if needed) if you run a Lido Ejector service with Stereum on the same host
       # - /opt/stereum:/opt/stereum
+      # - /etc/stereum:/etc/stereum:ro
       # Uncomment if temp data should be saved to local machine (for example to avoid re-download ethdo)
       # - ./.exitsigner-temp-directory:/tmp
     env_file: .env
