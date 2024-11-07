@@ -23,6 +23,7 @@ default_values = {
     "SIGN_PERCENT": default_settings.SIGN_PERCENT,
     "VALIDATOR_EJECTOR_MESSAGE_FOLDER": default_settings.VALIDATOR_EJECTOR_MESSAGE_FOLDER,
     "ETHDO_VERSION": default_settings.ETHDO_VERSION,
+    "MAX_DISTANCE": default_settings.MAX_DISTANCE,
     # VE-SSH
     "VE_SSH_HOSTNAME": default_settings.VE_SSH_HOSTNAME,
     "VE_SSH_USERNAME": default_settings.VE_SSH_USERNAME,
@@ -41,6 +42,7 @@ OPERATOR_ID = settings.OPERATOR_ID
 SIGN_PERCENT = settings.SIGN_PERCENT
 VALIDATOR_EJECTOR_MESSAGE_FOLDER = settings.VALIDATOR_EJECTOR_MESSAGE_FOLDER
 ETHDO_VERSION = settings.ETHDO_VERSION
+MAX_DISTANCE = settings.MAX_DISTANCE
 
 # VE-SSH
 VE_SSH_HOSTNAME = settings.VE_SSH_HOSTNAME
@@ -73,6 +75,7 @@ os.makedirs(EXITSIGNER_TEMP_DIR, exist_ok=True)
 # say(f"VALIDATOR_EJECTOR_MESSAGE_FOLDER: {VALIDATOR_EJECTOR_MESSAGE_FOLDER}")
 # say(f"ETHDO_VERSION: {ETHDO_VERSION}")
 # say(f"ETHDO_URL: {ETHDO_URL}")
+# say(f"MAX_DISTANCE: {MAX_DISTANCE}")
 # sys.exit()
 
 #
@@ -82,7 +85,7 @@ os.makedirs(EXITSIGNER_TEMP_DIR, exist_ok=True)
 def signForRemoteServer(args):
 
     # Set globals
-    global VALIDATOR_EJECTOR_MESSAGE_FOLDER, NODE_URL, OPERATOR_ID, SIGN_PERCENT
+    global VALIDATOR_EJECTOR_MESSAGE_FOLDER, NODE_URL, OPERATOR_ID, SIGN_PERCENT, MAX_DISTANCE
     global VE_SSH_HOSTNAME, VE_SSH_USERNAME, VE_SSH_KEYFILE, VE_SSH_PASSWORD, VE_SSH_TIMEOUT
     global DRY_KEY
 
@@ -149,6 +152,7 @@ def signForRemoteServer(args):
     # say(f"VALIDATOR_EJECTOR_MESSAGE_FOLDER: {VALIDATOR_EJECTOR_MESSAGE_FOLDER}")
     # say(f"ETHDO_VERSION: {ETHDO_VERSION}")
     # say(f"ETHDO_URL: {ETHDO_URL}")
+    # say(f"MAX_DISTANCE: {MAX_DISTANCE}")
     # sys.exit()
 
     # Check NODE_URL
@@ -169,6 +173,11 @@ def signForRemoteServer(args):
     # Check SIGN_PERCENT
     if not is_whole_number(SIGN_PERCENT) or SIGN_PERCENT > 100 or SIGN_PERCENT < 1:
         say("Setting SIGN_PERCENT invalid or not specified (Expected range 1-100)")
+        return
+    
+    # Check MAX_DISTANCE
+    if not is_whole_number(MAX_DISTANCE) or MAX_DISTANCE > 1024000 or MAX_DISTANCE < 1024:
+        say("Setting MAX_DISTANCE invalid or not specified (Expected range 1024-1024000)")
         return
     
     # Check VALIDATOR_EJECTOR_MESSAGE_FOLDER
@@ -244,7 +253,7 @@ def signForRemoteServer(args):
     say(f"Existing signed exit messages on ejector server {len(existing_signed_exit_messages)}")
     say(f"Existing signed exit messages on ejector server that are active {len(existing_signed_exit_messages_active)}")
     say(f"Existing signed exit messages on ejector server that are burned {len(existing_signed_exit_messages_burned)}")
-    say(f"Validators that have no signed exit message {len(validators_that_have_no_signed_exit_message)} (for each validator a signed exit messages need to be generated and added to ejector server)")
+    say(f"Validators that have no signed exit message {len(validators_that_have_no_signed_exit_message)} (for each validator a signed exit message need to be generated and added to the ejector server)")
 
     # Use only drykey?
     drykey = ""
@@ -271,7 +280,7 @@ def signForRemoteServer(args):
     
     # Handle MNEMONIC input
     if drykey:
-        say(f"IMPORTANT: Doing only *DRY RUN* with key {drykey[:5]+'..'+drykey[-5:]} (no changes will be applied on the ejector exit messages)!")
+        say(f"IMPORTANT: Doing only a *DRY RUN* with key {drykey[:5]+'..'+drykey[-5:]} (no changes will be applied on the ejector exit messages)!")
     if args.mnemonic:
         mnemonic = args.mnemonic
     else:
@@ -304,7 +313,7 @@ def signForRemoteServer(args):
         validator_key = validator['key']
         save_path_local = os.path.join(newmessages_tempdir, f"{validator_key}.json")
         save_path_remote = toLinPath(os.path.join(VALIDATOR_EJECTOR_MESSAGE_FOLDER, f"{validator_key}.json"))
-        process = subprocess.run(f"{ethdo_path} --timeout 30m --connection={NODE_URL} validator exit --json --verbose --debug --offline --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path_local}'", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
+        process = subprocess.run(f"{ethdo_path} --timeout 30m --connection={NODE_URL} validator exit --json --verbose --debug --offline --max-distance={MAX_DISTANCE} --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path_local}'", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
         exit_code = process.returncode
         err = process.stderr.strip()
         out = process.stdout.strip()
@@ -357,7 +366,7 @@ def signForRemoteServer(args):
 def main():
 
     # Set globals
-    global VALIDATOR_EJECTOR_MESSAGE_FOLDER, NODE_URL, OPERATOR_ID, SIGN_PERCENT
+    global VALIDATOR_EJECTOR_MESSAGE_FOLDER, NODE_URL, OPERATOR_ID, SIGN_PERCENT, MAX_DISTANCE
     global VE_SSH_HOSTNAME, VE_SSH_USERNAME, VE_SSH_KEYFILE, VE_SSH_PASSWORD, VE_SSH_TIMEOUT
     global DRY_KEY
 
@@ -371,6 +380,7 @@ def main():
     parser = argparse.ArgumentParser(description='Exit Signer (Auto sign exit messages for LIDO validators by mnemonic)')
     parser.add_argument('--mnemonic', type=str, help='Specify the mnemonic directly (optional and strictly *not* recommended)')
     parser.add_argument('--signpercent', nargs='?', const=True, type=int, default=SIGN_PERCENT, help=f'Percent of validators managed by the operator to sign exit messages for (Default: {SIGN_PERCENT})')
+    parser.add_argument('--max-distance', nargs='?', const=True, type=int, default=MAX_DISTANCE, help=f'Maximum indices to scan for finding validators (Default: {MAX_DISTANCE})')
     parser.add_argument('--writeconfig', action='store_true', help='Write .env file (if not exist) with default config values')
     parser.add_argument('--upgrade', action='store_true', help='Upgrade exitsigner application')
     parser.add_argument('--version', action='store_true', help='Get current version of the exitsigner')
@@ -418,6 +428,13 @@ def main():
             say("Invalid value for argument --signpercent (Expected range 1-100)")
             return
         SIGN_PERCENT=args.signpercent
+
+    # Handle --max-distance argument
+    if args.max_distance:
+        if not is_whole_number(args.max_distance) or args.max_distance > 1024000 or args.max_distance < 1024:
+            say("Invalid value for argument --max-distance (Expected range 1024-1024000)")
+            return
+        MAX_DISTANCE=args.max_distance
 
     # Handle --writeconfig argument
     if args.writeconfig:
@@ -488,6 +505,7 @@ def main():
     # say(f"VALIDATOR_EJECTOR_MESSAGE_FOLDER: {VALIDATOR_EJECTOR_MESSAGE_FOLDER}")
     # say(f"ETHDO_VERSION: {ETHDO_VERSION}")
     # say(f"ETHDO_URL: {ETHDO_URL}")
+    # say(f"MAX_DISTANCE: {MAX_DISTANCE}")
     # sys.exit()
 
     # Check NODE_URL
@@ -508,6 +526,11 @@ def main():
     # Check SIGN_PERCENT
     if not is_whole_number(SIGN_PERCENT) or SIGN_PERCENT > 100 or SIGN_PERCENT < 1:
         say("Setting SIGN_PERCENT invalid or not specified (Expected range 1-100)")
+        return
+    
+    # Check MAX_DISTANCE
+    if not is_whole_number(MAX_DISTANCE) or MAX_DISTANCE > 1024000 or MAX_DISTANCE < 1024:
+        say("Setting MAX_DISTANCE invalid or not specified (Expected range 1024-1024000)")
         return
     
     # Check VALIDATOR_EJECTOR_MESSAGE_FOLDER
@@ -580,7 +603,7 @@ def main():
     say(f"Existing signed exit messages on ejector server {len(existing_signed_exit_messages)}")
     say(f"Existing signed exit messages on ejector server that are active {len(existing_signed_exit_messages_active)}")
     say(f"Existing signed exit messages on ejector server that are burned {len(existing_signed_exit_messages_burned)}")
-    say(f"Validators that have no signed exit message {len(validators_that_have_no_signed_exit_message)} (for each validator a signed exit messages need to be generated and added to ejector server)")
+    say(f"Validators that have no signed exit message {len(validators_that_have_no_signed_exit_message)} (for each validator a signed exit message need to be generated and added to the ejector server)")
 
     # Use only drykey?
     drykey = ""
@@ -607,7 +630,7 @@ def main():
     
     # Handle MNEMONIC input
     if drykey:
-        say(f"IMPORTANT: Doing only *DRY RUN* with key {drykey[:5]+'..'+drykey[-5:]} (no changes will be applied on the ejector exit messages)!")
+        say(f"IMPORTANT: Doing only a *DRY RUN* with key {drykey[:5]+'..'+drykey[-5:]} (no changes will be applied on the ejector exit messages)!")
     if args.mnemonic:
         mnemonic = args.mnemonic
     else:
@@ -638,7 +661,7 @@ def main():
         validator_key = validator['key']
         save_path_temp = os.path.join(newmessages_tempdir, f"{validator_key}.json")
         save_path_live = os.path.join(VALIDATOR_EJECTOR_MESSAGE_FOLDER, f"{validator_key}.json")
-        process = subprocess.run(f"{ethdo_path} --timeout 30m --connection={NODE_URL} validator exit --json --verbose --debug --offline --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path_temp}'", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
+        process = subprocess.run(f"{ethdo_path} --timeout 30m --connection={NODE_URL} validator exit --json --verbose --debug --offline --max-distance={MAX_DISTANCE} --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path_temp}'", capture_output=True, text=True, shell=True, cwd=os.path.dirname(offline_preparation_json))
         exit_code = process.returncode
         err = process.stderr.strip()
         out = process.stdout.strip()

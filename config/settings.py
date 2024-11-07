@@ -105,8 +105,9 @@ class Settings(BaseSettings):
     OPERATOR_ID: int | None = None
     SIGN_PERCENT: int = 10
     VALIDATOR_EJECTOR_MESSAGE_FOLDER: str = ""
-    ETHDO_VERSION: str = "1.35.2"
+    ETHDO_VERSION: str = "1.36.1"
     ETHDO_URL: str = ""
+    MAX_DISTANCE: int = 20480
     
     #
     # BUILD
