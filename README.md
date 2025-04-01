@@ -15,7 +15,7 @@ Config options can be set as environment vars or defined in an .env file.
 | VALIDATOR_EJECTOR_MESSAGE_FOLDER | ""                    | No       | Path to exit messages (auto-detected for Stereum users)       |
 | ETHDO_VERSION                    | "1.37.3"              | No       | Version of ethdo executable to use for signing                |
 
-> SIGN_PERCENT can be overwritten using the `--sigpercent` argument
+> SIGN_PERCENT can be overwritten using the `--signpercent` argument
 
 # Production
 
