@@ -31,8 +31,9 @@ cd ~/exit-signer
 4. Download the latest exitsigner executable for your Operating System from the [releases page on Github](https://github.com/RockLogicGmbH/lido-validator-exit-signer/releases), to your local system and name it `exitsigner` for example:
 
 ```
-wget -O ./exitsigner https://github.com/RockLogicGmbH/lido-validator-exit-signer/releases/download/0.1.0/cli-ubuntu-latest
+wget -O ./exitsigner https://github.com/RockLogicGmbH/lido-validator-exit-signer/releases/download/0.1.3/exitsigner-ubuntu-latest
 ```
+**Make sure to check the version if you copy paste the command above!**
 
 5. Give the exitsigner application execute permission
 
