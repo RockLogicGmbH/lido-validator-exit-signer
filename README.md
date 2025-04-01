@@ -13,7 +13,7 @@ Config options can be set as environment vars or defined in an .env file.
 | OPERATOR_ID                      | ""                    | Yes      | Your LIDO Operator ID (auto-detected for Stereum users)       |
 | SIGN_PERCENT                     | 10                    | No       | Percent of operators validators to sign exit messages for     |
 | VALIDATOR_EJECTOR_MESSAGE_FOLDER | ""                    | No       | Path to exit messages (auto-detected for Stereum users)       |
-| ETHDO_VERSION                    | "1.35.2"              | No       | Version of ethdo executable to use for signing                |
+| ETHDO_VERSION                    | "1.37.3"              | No       | Version of ethdo executable to use for signing                |
 
 > SIGN_PERCENT can be overwritten using the `--sigpercent` argument
 
