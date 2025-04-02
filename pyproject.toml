@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "exitsigner"
-version = "0.2.0"
+version = "0.2.1"
 description = "Python based application to sign exit messages for the LIDO Validator Ejector"
 authors = ["RockLogic GmbH <exitsigner@rocklogic.at>"]
 readme = "README.md"
