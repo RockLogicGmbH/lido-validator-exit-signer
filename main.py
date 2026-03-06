@@ -20,7 +20,7 @@ default_values = {
     "OPERATOR_ID": "",
     "SIGN_PERCENT": 10,
     "VALIDATOR_EJECTOR_MESSAGE_FOLDER": "",
-    "ETHDO_VERSION": "1.37.3",
+    "ETHDO_VERSION": "1.39.0",
 }
 
 # Retrieve config values from environment or use defaults
