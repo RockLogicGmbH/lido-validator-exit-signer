@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import argparse
 import platform
 import subprocess
@@ -17,7 +18,7 @@ load_dotenv()
 default_values = {
     "KAPI_URL": "http://127.0.0.1:3600",
     "NODE_URL": "http://127.0.0.1:5052",
-    "OPERATOR_ID": "",
+    "EJECTOR_SCOPE": "",
     "SIGN_PERCENT": 10,
     "VALIDATOR_EJECTOR_MESSAGE_FOLDER": "",
     "ETHDO_VERSION": "1.39.0",
@@ -26,7 +27,11 @@ default_values = {
 # Retrieve config values from environment or use defaults
 NODE_URL = os.getenv("NODE_URL", default_values["NODE_URL"])
 KAPI_URL = os.getenv("KAPI_URL", default_values["KAPI_URL"])
-OPERATOR_ID = os.getenv("OPERATOR_ID", default_values["OPERATOR_ID"])
+EJECTOR_SCOPE = os.getenv("EJECTOR_SCOPE", default_values["EJECTOR_SCOPE"])
+# Legacy fallback: build EJECTOR_SCOPE from deprecated OPERATOR_ID (assumes module 1)
+_LEGACY_OPERATOR_ID = os.getenv("OPERATOR_ID", "")
+if not EJECTOR_SCOPE and _LEGACY_OPERATOR_ID:
+    EJECTOR_SCOPE = json.dumps({"1": [int(_LEGACY_OPERATOR_ID)]}) if is_whole_number(_LEGACY_OPERATOR_ID) else ""
 SIGN_PERCENT = int(os.getenv("SIGN_PERCENT", default_values["SIGN_PERCENT"]))
 VALIDATOR_EJECTOR_MESSAGE_FOLDER = os.getenv("VALIDATOR_EJECTOR_MESSAGE_FOLDER", default_values["VALIDATOR_EJECTOR_MESSAGE_FOLDER"])
 ETHDO_VERSION = os.getenv("ETHDO_VERSION", default_values["ETHDO_VERSION"])
@@ -59,7 +64,7 @@ else:
 def main():
 
     # Set globals
-    global VALIDATOR_EJECTOR_MESSAGE_FOLDER, NODE_URL, OPERATOR_ID, SIGN_PERCENT
+    global VALIDATOR_EJECTOR_MESSAGE_FOLDER, NODE_URL, EJECTOR_SCOPE, SIGN_PERCENT
 
     # Set script home directory
     SCRIPT_HOME_DIR = script_home_dir()
@@ -123,7 +128,7 @@ def main():
     if args.debug:
         print(f"[DEBUG] VALIDATOR_EJECTOR_MESSAGE_FOLDER = {VALIDATOR_EJECTOR_MESSAGE_FOLDER}")
 
-    # Auto detect NODE_URL and OPERATOR_ID if not defined in config and VALIDATOR_EJECTOR_FOLDER could be found
+    # Auto detect NODE_URL and EJECTOR_SCOPE if not defined in config and VALIDATOR_EJECTOR_FOLDER could be found
     if VALIDATOR_EJECTOR_FOLDER:
         validator_ejector_config_id = os.path.basename(VALIDATOR_EJECTOR_FOLDER.replace("validatorejector-", ""))
         validator_ejector_yaml_file = f"/etc/stereum/services/{validator_ejector_config_id}.yaml"
@@ -132,12 +137,19 @@ def main():
             print(f"[DEBUG] validator_ejector_yaml_file = {validator_ejector_yaml_file}")
         if os.path.exists(validator_ejector_yaml_file):
             validator_ejector_yaml_data = read_yaml_file(validator_ejector_yaml_file)
-            NODE_URL = validator_ejector_yaml_data['env']['CONSENSUS_NODE'] if NODE_URL == default_values["NODE_URL"] else NODE_URL
-            OPERATOR_ID = validator_ejector_yaml_data['env']['OPERATOR_ID'] if OPERATOR_ID == default_values["OPERATOR_ID"] else OPERATOR_ID
+            yaml_env = validator_ejector_yaml_data.get('env', {}) or {}
+            if NODE_URL == default_values["NODE_URL"] and yaml_env.get('CONSENSUS_NODE'):
+                NODE_URL = yaml_env['CONSENSUS_NODE']
+            if not EJECTOR_SCOPE:
+                if yaml_env.get('EJECTOR_SCOPE'):
+                    EJECTOR_SCOPE = yaml_env['EJECTOR_SCOPE']
+                elif yaml_env.get('OPERATOR_ID') and is_whole_number(yaml_env.get('OPERATOR_ID')):
+                    # Legacy fallback: build scope from deprecated OPERATOR_ID (assumes module 1)
+                    EJECTOR_SCOPE = json.dumps({"1": [int(yaml_env['OPERATOR_ID'])]})
             if args.debug:
                 print(f"[DEBUG] validator_ejector_yaml_data = ",validator_ejector_yaml_data)
                 print(f"[DEBUG] NODE_URL = {NODE_URL}")
-                print(f"[DEBUG] OPERATOR_ID = {OPERATOR_ID}")
+                print(f"[DEBUG] EJECTOR_SCOPE = {EJECTOR_SCOPE}")
 
     # Show config values
     # print(f"NODE_URL: {NODE_URL}")
@@ -149,19 +161,67 @@ def main():
     # print(f"ETHDO_URL: {ETHDO_URL}")
     # sys.exit()
 
-    # Check NODE_URL
-    if not is_valid_url(NODE_URL):
-        print("Setting NODE_URL invalid or not specified (Expected valid URL)")
+    # Check NODE_URL (may be a comma-separated list of endpoints)
+    node_urls = [u.strip() for u in NODE_URL.split(",") if u.strip()]
+    if not node_urls or not all(is_valid_url(u) for u in node_urls):
+        print("Setting NODE_URL invalid or not specified (Expected valid URL or comma-separated list of URLs)")
         return
-    
+
     # Check KAPI_URL
     if not is_valid_url(KAPI_URL):
         print("Setting KAPI_URL invalid or not specified (Expected valid URL)")
         return
-    
-    # Check OPERATOR_ID
-    if not OPERATOR_ID or not is_whole_number(OPERATOR_ID):
-        print("Setting OPERATOR_ID invalid or not specified")
+
+    # Verify KAPI readiness via /v1/status
+    print("Check KAPI readiness")
+    ok, msg = check_kapi_ready(KAPI_URL)
+    if args.debug:
+        print(f"[DEBUG] KAPI check: {msg}")
+    if not ok:
+        print(f"KAPI not ready: {msg}")
+        return
+
+    # Verify beacon node readiness via /eth/v1/node/syncing; pick the first synced endpoint for ethdo
+    print("Check beacon node readiness")
+    selected_node_url = None
+    node_failures = []
+    for url in node_urls:
+        ok, msg = check_node_synced(url)
+        if args.debug:
+            print(f"[DEBUG] Node check {url}: {msg}")
+        if ok:
+            selected_node_url = url
+            break
+        node_failures.append(f"{url}: {msg}")
+    if not selected_node_url:
+        print("No usable beacon node endpoint:")
+        for f in node_failures:
+            print(f"  - {f}")
+        return
+    NODE_URL = selected_node_url
+    if len(node_urls) > 1:
+        print(f"Using beacon node: {NODE_URL}")
+
+    # Check EJECTOR_SCOPE
+    if not EJECTOR_SCOPE:
+        print('Setting EJECTOR_SCOPE invalid or not specified (Expected JSON like \'{"1":[54,55]}\')')
+        return
+    try:
+        ejector_scope_parsed = json.loads(EJECTOR_SCOPE)
+        if not isinstance(ejector_scope_parsed, dict) or not ejector_scope_parsed:
+            raise ValueError("must be a non-empty object mapping module id to operator ids")
+        scope_pairs = []
+        for module_id, operator_ids in ejector_scope_parsed.items():
+            if not is_whole_number(module_id):
+                raise ValueError(f'invalid module id "{module_id}"')
+            if not isinstance(operator_ids, list) or not operator_ids:
+                raise ValueError(f'module {module_id} must map to a non-empty list of operator ids')
+            for op in operator_ids:
+                if not is_whole_number(op):
+                    raise ValueError(f'invalid operator id "{op}" in module {module_id}')
+                scope_pairs.append((int(module_id), int(op)))
+    except (ValueError, json.JSONDecodeError) as e:
+        print(f'Setting EJECTOR_SCOPE invalid ({e}). Expected JSON like \'{{"1":[54,55]}}\'')
         return
     
     # Check SIGN_PERCENT
@@ -213,11 +273,15 @@ def main():
         filename_without_extension = os.path.splitext(os.path.basename(filepath))[0]
         existing_signed_exit_messages.append(filename_without_extension)
 
-    # Get validators that need a signed exit message from KAPI
-    jsonresult = get_validators_that_need_a_signed_exit_message_from_kapi(OPERATOR_ID, KAPI_URL,SIGN_PERCENT)
-    if not jsonresult:
-        return
-    validators_that_need_a_signed_exit_message = jsonresult["data"]
+    # Get validators that need a signed exit message from KAPI for every (module_id, operator_id) in scope
+    validators_that_need_a_signed_exit_message = []
+    for module_id, operator_id in scope_pairs:
+        if args.debug:
+            print(f"[DEBUG] Fetching KAPI validators for module {module_id} operator {operator_id}")
+        jsonresult = get_validators_that_need_a_signed_exit_message_from_kapi(operator_id, KAPI_URL, SIGN_PERCENT, module_id=module_id)
+        if not jsonresult:
+            return
+        validators_that_need_a_signed_exit_message.extend(jsonresult["data"])
 
     # Generate infos of messages that are active, burned or need to be generated
     existing_signed_exit_messages_active, existing_signed_exit_messages_burned, validators_that_have_no_signed_exit_message = [], [], []
@@ -271,7 +335,7 @@ def main():
         validator_key = validator['key']
         #save_path = os.path.join(newmessages_tempdir, f"{validator_key}.json")
         save_path = os.path.join(VALIDATOR_EJECTOR_MESSAGE_FOLDER, f"{validator_key}.json")
-        process = subprocess.run(f"{ethdo_path} --connection={NODE_URL} validator exit --json --verbose --debug --offline --max-distance=20480 --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path}'", capture_output=True, text=True, shell=True)
+        process = subprocess.run(f"{ethdo_path} --connection={NODE_URL} validator exit --json --verbose --debug --offline --max-distance=102400 --validator='{validator_key}' --mnemonic='{mnemonic}' > '{save_path}'", capture_output=True, text=True, shell=True)
         exit_code = process.returncode
         err = process.stderr.strip()
         out = process.stdout.strip()
