@@ -275,16 +275,19 @@ def is_whole_number(num, strict=False):
         return False
     
 # Function to get validators that need signed exit messages from KAPI
-def get_validators_that_need_a_signed_exit_message_from_kapi(operator_id, kapi_url, percent=10):
+def get_validators_that_need_a_signed_exit_message_from_kapi(operator_id, kapi_url, percent=10, module_id=1):
     if not is_whole_number(operator_id):
         if operator_id:
             print(f'Invalid operator id "{operator_id}" for KAPI request specified')
         else:
-            print(f'No operator id for KAPI request specified') 
+            print(f'No operator id for KAPI request specified')
+        return False
+    if not is_whole_number(module_id):
+        print(f'Invalid module id "{module_id}" for KAPI request specified')
         return False
     try:
         percent = percent if is_whole_number(percent) and percent > 0 and percent <= 100 else 10
-        result = requests.get(f"{kapi_url}/v1/modules/1/validators/validator-exits-to-prepare/{operator_id}?percent={percent}")
+        result = requests.get(f"{kapi_url}/v1/modules/{module_id}/validators/validator-exits-to-prepare/{operator_id}?percent={percent}")
         if result.status_code == 200:
             jsonresp = result.json()
             if "data" in jsonresp:
@@ -297,6 +300,49 @@ def get_validators_that_need_a_signed_exit_message_from_kapi(operator_id, kapi_u
     except Exception as e:
             print(f"Request to KAPI failed with error: {e}")
             return False
+
+# Check that the KAPI service is reachable and ready (has up-to-date block snapshots).
+# Returns (ok: bool, message: str).
+def check_kapi_ready(kapi_url, timeout=10):
+    try:
+        result = requests.get(f"{kapi_url}/v1/status", timeout=timeout)
+    except Exception as e:
+        return False, f"KAPI unreachable at {kapi_url} ({e})"
+    if result.status_code != 200:
+        return False, f"KAPI status endpoint returned HTTP {result.status_code}"
+    try:
+        data = result.json()
+    except Exception as e:
+        return False, f"KAPI status returned invalid JSON ({e})"
+    if data.get("elBlockSnapshot") is None:
+        return False, "KAPI not ready (elBlockSnapshot is null)"
+    if data.get("clBlockSnapshot") is None:
+        return False, "KAPI not ready (clBlockSnapshot is null)"
+    return True, f"KAPI ready (chainId={data.get('chainId')}, appVersion={data.get('appVersion')})"
+
+# Check that a beacon node is reachable and fully synced via /eth/v1/node/syncing.
+# Returns (ok: bool, message: str).
+def check_node_synced(node_url, timeout=10):
+    try:
+        result = requests.get(f"{node_url.rstrip('/')}/eth/v1/node/syncing", timeout=timeout)
+    except Exception as e:
+        return False, f"Beacon node unreachable at {node_url} ({e})"
+    if result.status_code != 200:
+        return False, f"Beacon node /eth/v1/node/syncing returned HTTP {result.status_code}"
+    try:
+        payload = result.json().get("data", {})
+    except Exception as e:
+        return False, f"Beacon node syncing endpoint returned invalid JSON ({e})"
+    # Spec returns strings for booleans in some clients; coerce loosely
+    def _truthy(v):
+        return str(v).lower() == "true" if not isinstance(v, bool) else v
+    if _truthy(payload.get("is_syncing", False)):
+        return False, f"Beacon node is still syncing (sync_distance={payload.get('sync_distance')})"
+    if _truthy(payload.get("is_optimistic", False)):
+        return False, "Beacon node is optimistic (EL not fully verified)"
+    if _truthy(payload.get("el_offline", False)):
+        return False, "Beacon node reports el_offline=true"
+    return True, f"Beacon node synced (head_slot={payload.get('head_slot')})"
 
 # Get first key from list where value contains "search"
 # Example
