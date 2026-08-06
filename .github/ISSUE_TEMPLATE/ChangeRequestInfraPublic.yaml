@@ -1,0 +1,211 @@
+name: Change Request Infra
+description: Request an infrastructure change to an existing system or process.
+labels:
+  - "Change_Request"
+type: Change Request
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Section 1: General Information
+
+  - type: input
+    id: req_name
+    attributes:
+      label: Requester Name
+      description: Requester is the creator of this ticket unless otherwise specified
+      placeholder: Requester is the creator of this ticket
+    validations:
+      required: false
+
+  - type: input
+    id: department
+    attributes:
+      label: Department/Team
+      placeholder: e.g. Infra, Dev, IT Admin
+    validations:
+      required: true
+
+  - type: input
+    id: project_name
+    attributes:
+      label: Project / System Name
+      placeholder: Name of the affected project or system
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Section 2: Change Details
+
+  - type: textarea
+    id: change_description
+    attributes:
+      label: Description of Change
+      description: Detailed description of the requested change, including affected components/modules.
+      placeholder: Describe the requested change and affected components/modules in detail...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason_for_change
+    attributes:
+      label: Reason for Change
+      description: Business or technical justification for the change.
+      placeholder: Explain why this change is necessary...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tools_used
+    attributes:
+      label: Tools Used
+      description: Specify the tools involved in the change.
+      placeholder: e.g., AWS, Docker
+    validations:
+      required: false
+
+  - type: textarea
+    id: capacity
+    attributes:
+      label: Capacity Changes
+      description: Specify any capacity changes (e.g., CPU, RAM, Storage).
+      placeholder: e.g., Increased VM Storage
+    validations:
+      required: false
+
+  - type: input
+    id: deadline
+    attributes:
+      label: Deadline
+      description: Desired completion date for the change.
+      placeholder: dd.mm.yyyy
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Section 3: Security Impact Analysis
+
+  - type: dropdown
+    id: security_impact
+    attributes:
+      label: Is there any potential impact on security?
+      options:
+        - "Yes"
+        - "No"
+        - "Unsure (requires further review)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: security_impact_details
+    attributes:
+      label: Details of Security Impact
+      description: Provide details if the change could impact confidentiality, integrity, or availability (e.g., access control, data handling, etc.).
+      placeholder: Describe potential security impacts...
+    validations:
+      required: false
+
+  - type: textarea
+    id: mitigation_plan
+    attributes:
+      label: Mitigation Plan (if applicable)
+      description: Steps to mitigate potential risks or vulnerabilities introduced by the change.
+      placeholder: Describe mitigation steps...
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Section 4: Approvals
+
+  - type: input
+    id: requester_name
+    attributes:
+      label: Requester Name
+      placeholder: Full Name
+    validations:
+      required: false
+
+  - type: input
+    id: requester_date
+    attributes:
+      label: Requester Date
+      placeholder: dd.mm.yyyy
+    validations:
+      required: false
+
+  - type: input
+    id: security_name
+    attributes:
+      label: Security Reviewer Name
+      placeholder: Full Name
+    validations:
+      required: false
+
+  - type: input
+    id: security_date
+    attributes:
+      label: Security Reviewer Date
+      placeholder: dd.mm.yyyy
+    validations:
+      required: false
+
+  - type: input
+    id: management_name
+    attributes:
+      label: Management Name
+      placeholder: Full Name
+    validations:
+      required: false
+
+  - type: input
+    id: management_date
+    attributes:
+      label: Management Date
+      placeholder: dd.mm.yyyy
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Section 5: Post-Implementation Validation (if needed)
+
+  - type: input
+    id: validation_date
+    attributes:
+      label: Validation Date
+      placeholder: dd.mm.yyyy
+    validations:
+      required: false
+
+  - type: input
+    id: validation_performed_by
+    attributes:
+      label: Validation Performed By
+      placeholder: Full Name
+    validations:
+      required: false
+
+  - type: dropdown
+    id: security_testing_performed
+    attributes:
+      label: Security Testing Performed
+      options:
+        - "Yes"
+        - "No"
+        - "N/A"
+    validations:
+      required: false
+
+  - type: textarea
+    id: validation_notes
+    attributes:
+      label: Validation Notes
+      description: Summarize findings and confirm whether the change has no adverse security effects / if the validation is done.
+      placeholder: Add validation notes or observations...

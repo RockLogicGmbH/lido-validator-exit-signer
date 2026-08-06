@@ -1,0 +1,76 @@
+name: Change Request Dev
+description: Request a development change to an existing system or process.
+labels:
+  - "Change_Request"
+type: Change Request
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Section 1: General Information
+  - type: input
+    id: req_name
+    attributes:
+      label: Requester Name
+      description: Requester is the creator of this ticket unless otherwise specified
+      placeholder: Requester is the creator of this ticket
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        ## Section 2: Change Details
+  - type: textarea
+    id: change_description
+    attributes:
+      label: Description of Change
+      description: Provide a detailed description of the requested change.
+      placeholder: Describe the requested change in detail...
+    validations:
+      required: true
+  - type: textarea
+    id: reason_for_change
+    attributes:
+      label: Reason for Change
+      description: Business or technical justification for the change.
+      placeholder: Explain why this change is necessary...
+    validations:
+      required: true
+  - type: textarea
+    id: affected_components
+    attributes:
+      label: Affected Components/Modules
+      description: List all impacted components or modules.
+      placeholder: List components or modules here...
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        ## Section 3: Security Impact Analysis
+  - type: dropdown
+    id: security_impact
+    attributes:
+      label: Is there any potential impact on security?
+      options:
+        - "Yes"
+        - "No"
+        - "Unsure (requires further review)"
+    validations:
+      required: true
+  - type: textarea
+    id: security_impact_details
+    attributes:
+      label: Details of Security Impact
+      description: Provide details if the change could impact confidentiality, integrity, or availability (e.g., access control, data handling, etc.).
+      placeholder: Describe potential security impacts...
+    validations:
+      required: false
+  - type: textarea
+    id: mitigation_plan
+    attributes:
+      label: Mitigation Plan (if applicable)
+      description: Steps to mitigate potential risks or vulnerabilities introduced by the change.
+      placeholder: Describe mitigation steps...
+    validations:
+      required: false
