@@ -1,7 +1,14 @@
 name: Sync labels
 
+# Distributed into every repo by scripts/distribute-templates. Reads the repo's
+# OWN .github/labels.yml (also distributed), so there is no dependency on the
+# private .github repository. Runs automatically when that local labels.yml
+# changes (e.g. when a distribution PR merges) or on manual dispatch.
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/labels.yml"
 
 permissions:
   issues: write
@@ -12,12 +19,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout shared .github repo
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          repository: RockLogicGmbH/.github
-          ref: main
-          sparse-checkout: .github/labels.yml
 
       - name: Sync labels
         uses: EndBug/label-sync@v2
