@@ -1,0 +1,124 @@
+name: Access Request for Existing User
+description: Request tool/system access for existing users.
+title: "[Access Request]: "
+labels:
+  - "Access_Request"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for raising a tool/system access request!
+
+  - type: input
+    id: name
+    attributes:
+      label: User name requesting access.
+      description: Requester is the creator of this ticket unless otherwise specified
+      placeholder: Requester is the creator of this ticket
+    validations:
+      required: false
+
+  - type: input
+    id: role
+    attributes:
+      label: Requested User role
+      description: Enter role of user requesting for access.
+      placeholder: HR/Developer..etc
+    validations:
+      required: true
+
+  - type: input
+    id: department
+    attributes:
+      label: Requested User Team or Department
+      description: Enter Team/Department of user requesting for access.
+      placeholder: Marketing/Node Op..etc
+    validations:
+      required: true
+
+  - type: textarea
+    id: systems
+    attributes:
+      label: Systems / Resources
+      description: List the systems, tools, VMs, or resources you need access to.
+      placeholder: |
+        e.g. VM (name/purpose), specific repository, internal portal, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: github_repos
+    attributes:
+      label: GitHub Repositories
+      description: If you need access to specific GitHub repositories, please list them here.
+      placeholder: "org/repo-name-1\norg/repo-name-2"
+
+  - type: textarea
+    id: github_token
+    attributes:
+      label: GitHub Token
+      description: |
+        If you need a fine-grained GitHub token, please describe the required permissions.
+        Include: token name, expiration, target repositories, and all required permissions (e.g. Contents: Read, Pull requests: Write, Metadata: Read).
+      placeholder: |
+        Name: ci-deploy-token | Expiration: 90 days
+        Repos: org/repo-name
+        Permissions: Contents: Read, Pull requests: Write
+
+  - type: textarea
+    id: facility_access
+    attributes:
+      label: Facility / Site Access
+      description: If you need physical or VPN access to a specific site or facility, describe it here.
+      placeholder: e.g. VPN access to site X, physical access to site Y
+
+  - type: textarea
+    id: software
+    attributes:
+      label: Software
+      description: List the software or applications you need access to.
+
+  - type: textarea
+    id: customer_access
+    attributes:
+      label: Customer-related Access
+      description: If this request relates to a specific customer engagement, describe it here without naming sensitive details if not required.
+
+  - type: textarea
+    id: admin_tools
+    attributes:
+      label: Admin Tools
+      description: List any admin tools you need access to.
+
+  - type: markdown
+    attributes:
+      value: "## Miscellaneous"
+
+  - type: textarea
+    id: misc_apps_mac_ios
+    attributes:
+      label: Request for Apps [Mac/iOS]
+
+  - type: textarea
+    id: misc_apps_android
+    attributes:
+      label: Request for Apps [Android]
+
+  - type: textarea
+    id: misc_apps_windows
+    attributes:
+      label: Request for Apps [Windows]
+
+  - type: textarea
+    id: misc_other
+    attributes:
+      label: Miscellaneous Information or Requests
+      description: If you have more specific access requests, please mention them here.
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: Reason and additional details for access
+      description: |
+        Provide justification for why the access is required.
+      required: true
